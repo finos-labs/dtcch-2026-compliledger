@@ -1,0 +1,16 @@
+{
+  "name": "SettlementGuard",
+  "short_name": "SG",
+  "description": "Proof-based settlement enforcement infrastructure",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
