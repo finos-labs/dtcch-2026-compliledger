@@ -5,6 +5,7 @@ import { SGFooter } from "@/components/sg-footer";
 import { SGHeader } from "@/components/sg-header";
 import { SGHero } from "@/components/sg-hero";
 import { SGUISections } from "@/components/sg-ui-sections";
+import { ThemeSwitch } from "@/components/theme-switch";
 import { createMetadata, siteConfig } from "@/lib/metadata";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -19,6 +20,7 @@ export default function HomePage(): ReactNode {
   return (
     <>
       <SGHeader />
+      <ThemeSwitch />
       <main id="main-content" className="flex-1">
         <SGHero />
 
