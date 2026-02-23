@@ -44,7 +44,7 @@ const audiences: AudienceMessage[] = [
     points: [
       "As tokenized asset markets scale, retrospective compliance will not be acceptable to regulators or institutional counterparties.",
       "SettlementGuard is the infrastructure layer that makes proof-based settlement the new standard.",
-      "Organizations that adopt enforcement-first infrastructure today become the trusted settlement venues of tomorrow.",
+      "Organizations that adopt enforcement-first infrastructure today become the proven settlement venues of tomorrow.",
     ],
   },
   {

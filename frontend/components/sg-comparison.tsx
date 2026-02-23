@@ -66,7 +66,7 @@ const comparisonData = {
       title: "Issuer legitimacy",
       description: "Validation of the issuing entity",
       guard: "Cryptographic check",
-      traditional: "Trust-based",
+      traditional: "Assumption-based",
     },
     {
       title: "Custody conditions",
@@ -81,7 +81,7 @@ const comparisonData = {
       traditional: false,
     },
     {
-      title: "Automated compliance",
+      title: "Deterministic enforcement",
       description: "Zero manual intervention in the enforcement loop",
       guard: true,
       traditional: false,
@@ -90,14 +90,14 @@ const comparisonData = {
   digital: [
     {
       title: "Asset classification",
-      description: "Automated determination of regulatory category",
+      description: "Deterministic classification of regulatory category",
       guard: "Deterministic engine",
       traditional: "Legal opinion",
     },
     {
       title: "Transfer restrictions",
       description: "Enforcement of jurisdictional transfer rules",
-      guard: "Pre-settlement gate",
+      guard: "Pre-finality gate",
       traditional: "Post-transfer review",
     },
     {

@@ -90,7 +90,7 @@ export function VerifyPanel(): ReactNode {
         </button>
 
         {error && (
-          <p className="text-xs text-sg-deny">{error}</p>
+          <p className="text-xs text-red-500">{error}</p>
         )}
 
         {result && (
@@ -130,7 +130,7 @@ export function VerifyPanel(): ReactNode {
                 </p>
               )}
               {result.tx_hash && (
-                <p className="text-muted-foreground">
+                <p className="text-gray-600">
                   tx_hash: <span className="font-mono text-gray-800">{result.tx_hash.slice(0, 20)}...</span>
                 </p>
               )}

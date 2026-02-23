@@ -40,7 +40,7 @@ const features: Feature[] = [
     icon: CheckCircle2,
     title: "Cryptographic Settlement Attestation",
     description:
-      "If and only if all checks pass, SettlementGuard issues a digitally signed attestation. Cryptographically bound to the proof bundle — machine-verifiable evidence, not a dashboard checkbox.",
+      "If and only if all checks pass, SettlementGuard issues a digitally signed attestation. Cryptographically bound to the proof bundle — machine-verifiable evidence, not a compliance checkbox.",
   },
   {
     icon: Anchor,

@@ -53,7 +53,7 @@ export function ReasoningPanel({ intentId }: ReasoningPanelProps): ReactNode {
           <Brain className="h-4 w-4" />
           Generate AI Analysis
         </button>
-        {error && <p className="mt-2 text-xs text-sg-deny">{error}</p>}
+        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
       </motion.div>
     );
   }

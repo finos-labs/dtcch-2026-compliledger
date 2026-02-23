@@ -13,7 +13,6 @@ const footerCards = [
       { text: "Features", href: "#features" },
       { text: "Live Demo", href: "#demo" },
       { text: "Verification Flow", href: "#verification" },
-      { text: "Language Guide", href: "#" },
     ],
   },
   {

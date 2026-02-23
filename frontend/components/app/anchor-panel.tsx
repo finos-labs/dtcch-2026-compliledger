@@ -59,7 +59,7 @@ export function AnchorPanel({ intentId, anchor: initialAnchor }: AnchorPanelProp
             {loading ? "Anchoring..." : "Anchor on Canton"}
           </button>
           {error && (
-            <p className="mt-2 text-xs text-sg-deny">{error}</p>
+            <p className="mt-2 text-xs text-red-500">{error}</p>
           )}
         </div>
       )}

@@ -13,7 +13,7 @@ const faqs: FAQItem[] = [
   {
     question: "What is SettlementGuard?",
     answer:
-      "SettlementGuard is the enforcement layer that sits between a settlement intent and settlement finality. It deterministically evaluates compliance through a Canonical Proof Chain and either proves the settlement should proceed — or stops it. It is not a settlement system, a custody platform, or a compliance registry.",
+      "SettlementGuard is the enforcement layer that sits between a settlement intent and settlement finality. It deterministically evaluates compliance through a Canonical Proof Chain and either proves the settlement should proceed — or stops it. It is not a settlement system, a custody platform, or a compliance monitor.",
   },
   {
     question: "How does the Canonical Proof Chain work?",

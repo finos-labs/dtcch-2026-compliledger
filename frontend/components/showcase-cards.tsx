@@ -37,7 +37,7 @@ const cards: CardData[] = [
     image: "/img/mock5_compressed.webp",
   },
   {
-    title: "SaaS Dashboard",
+    title: "SaaS Platform",
     image: "/img/mock9_compressed.webp",
   },
 ];

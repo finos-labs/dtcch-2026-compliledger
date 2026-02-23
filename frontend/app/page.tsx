@@ -7,7 +7,6 @@ import { SGFeatures } from "@/components/sg-features";
 import { SGFooter } from "@/components/sg-footer";
 import { SGHeader } from "@/components/sg-header";
 import { SGHero } from "@/components/sg-hero";
-import { SGLanguage } from "@/components/sg-language";
 import { SGMessages } from "@/components/sg-messages";
 import { SGStats } from "@/components/sg-stats";
 import { SGUISections } from "@/components/sg-ui-sections";
@@ -69,9 +68,6 @@ export default function HomePage(): ReactNode {
 
         {/* Calls to Action */}
         <SGCTASections />
-
-        {/* Language Guide */}
-        <SGLanguage />
 
         {/* FAQ */}
         <SGFAQ />

@@ -38,7 +38,7 @@ const stats: Stat[] = [
     sg: 100,
     traditional: 8,
     unit: "%",
-    description: "Cryptographic proof vs trust-based records",
+    description: "Cryptographic proof vs assumption-based records",
   },
 ];
 

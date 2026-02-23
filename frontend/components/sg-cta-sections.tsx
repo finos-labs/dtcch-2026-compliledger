@@ -237,7 +237,7 @@ export function SGCTASections(): ReactNode {
             <ShieldCheck className="mt-1 h-6 w-6 shrink-0 text-accent" />
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-accent">
-                Verification / Trust CTA
+                Verification CTA
               </p>
               <h3 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
                 Verify Any Attestation, Any Time
