@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { SGHeader } from "@/components/sg-header";
 import { SGFooter } from "@/components/sg-footer";
+import { ThemeSwitch } from "@/components/theme-switch";
 import { ProofChainPanel } from "@/components/app/proof-chain-panel";
 import { AttestationPanel } from "@/components/app/attestation-panel";
 import { AnchorPanel } from "@/components/app/anchor-panel";
@@ -18,6 +19,7 @@ export default function AppPage(): ReactNode {
   return (
     <div className="sg-light-dashboard">
       <SGHeader />
+      <ThemeSwitch />
       <main className="mx-auto min-h-screen max-w-7xl px-4 pb-24 pt-28 sm:px-6 lg:px-8">
         <div className="mb-10">
           <h1 className="text-3xl font-medium tracking-tight text-gray-900 md:text-4xl">
