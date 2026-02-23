@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
@@ -9,6 +10,8 @@ import { computeDecision } from "./decision";
 import { issueAttestation, recomputeAttestationHash } from "./attestation";
 import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db";
 import { PRESETS } from "./presets";
+import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
+import { generateComplianceReasoning } from "./bedrock-reasoning";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -177,7 +180,7 @@ app.get("/v1/intents/:id", (req, res) => {
 });
 
 // POST /v1/verify — Verify an attestation
-app.post("/v1/verify", (req, res) => {
+app.post("/v1/verify", async (req, res) => {
   const body = req.body as VerifyRequest;
 
   if (!body.attestation_json || !body.signature) {
@@ -204,11 +207,23 @@ app.post("/v1/verify", (req, res) => {
   let onChain: boolean | null = null;
   let txHash: string | null = null;
 
-  if (body.check_chain && bundleRecord?.anchor) {
-    onChain = true;
-    txHash = bundleRecord.anchor.tx_hash;
-  } else if (body.check_chain) {
-    onChain = false;
+  if (body.check_chain) {
+    try {
+      const dynamoRecord = await lookupByAttestationHash(attestationHash);
+      if (dynamoRecord) {
+        onChain = true;
+        txHash = dynamoRecord.tx_hash;
+      } else {
+        onChain = false;
+      }
+    } catch {
+      if (bundleRecord?.anchor) {
+        onChain = true;
+        txHash = bundleRecord.anchor.tx_hash;
+      } else {
+        onChain = false;
+      }
+    }
   }
 
   const response: VerifyResponse = {
@@ -221,8 +236,8 @@ app.post("/v1/verify", (req, res) => {
   res.json(response);
 });
 
-// POST /v1/attestations/:id/anchor — Anchor an attestation on-chain
-app.post("/v1/attestations/:id/anchor", (req, res) => {
+// POST /v1/attestations/:id/anchor — Anchor an attestation on-chain (DynamoDB)
+app.post("/v1/attestations/:id/anchor", async (req, res) => {
   const record = getIntent(req.params.id);
   if (!record) {
     res.status(404).json({ error: "Intent not found" });
@@ -242,22 +257,52 @@ app.post("/v1/attestations/:id/anchor", (req, res) => {
     return;
   }
 
-  // Simulate Canton anchoring
-  // In production, this would call the Canton Network Ledger API
-  const anchor: AnchorRecord = {
-    commitment_id: `canton-${uuidv4().slice(0, 8)}`,
-    tx_hash: `0x${sha256(record.signed_attestation.attestation_hash + Date.now()).slice(0, 64)}`,
-    anchored_at: new Date().toISOString(),
-    bundle_root_hash: record.bundle.bundle_root_hash,
-    attestation_hash: record.signed_attestation.attestation_hash,
-  };
+  try {
+    const anchor = await anchorToDynamo(
+      record.bundle.bundle_root_hash,
+      record.signed_attestation.attestation_hash,
+      record.id,
+      record.bundle.asset_type
+    );
 
-  updateAnchor(record.id, anchor);
+    updateAnchor(record.id, anchor);
 
-  res.json({
-    anchored: true,
-    anchor,
-  });
+    res.json({
+      anchored: true,
+      network: "canton-global-synchronizer",
+      storage: "dynamodb",
+      anchor,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    if (message.includes("ConditionalCheckFailedException")) {
+      res.status(409).json({ error: "Already anchored on-chain" });
+    } else {
+      console.error("Anchor error:", err);
+      res.status(500).json({ error: "Anchoring failed", details: message });
+    }
+  }
+});
+
+// POST /v1/reasoning/:id — Generate AI compliance reasoning for an intent
+app.post("/v1/reasoning/:id", async (req, res) => {
+  const record = getIntent(req.params.id);
+  if (!record) {
+    res.status(404).json({ error: "Intent not found" });
+    return;
+  }
+
+  try {
+    const reasoning = await generateComplianceReasoning(
+      record.intent,
+      record.bundle.steps,
+      record.decision_record.decision
+    );
+    res.json(reasoning);
+  } catch (err: unknown) {
+    console.error("Reasoning error:", err);
+    res.status(500).json({ error: "AI reasoning generation failed" });
+  }
 });
 
 // GET /v1/presets — List available demo presets

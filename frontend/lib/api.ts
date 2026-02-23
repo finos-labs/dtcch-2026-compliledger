@@ -113,10 +113,34 @@ export async function verifyAttestation(
   return res.json();
 }
 
+export interface StepExplanation {
+  step_name: string;
+  pass: boolean;
+  explanation: string;
+}
+
+export interface ComplianceReasoning {
+  summary: string;
+  step_explanations: StepExplanation[];
+  risk_assessment: string;
+  recommendation: string;
+}
+
 export async function getIntent(intentId: string): Promise<EnforcementResult> {
   const res = await fetch(`${API_BASE}/v1/intents/${intentId}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch intent: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchReasoning(intentId: string): Promise<ComplianceReasoning> {
+  const res = await fetch(`${API_BASE}/v1/reasoning/${intentId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    throw new Error(`Reasoning failed: ${res.statusText}`);
   }
   return res.json();
 }

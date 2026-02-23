@@ -8,6 +8,7 @@ import { AttestationPanel } from "@/components/app/attestation-panel";
 import { AnchorPanel } from "@/components/app/anchor-panel";
 import { VerifyPanel } from "@/components/app/verify-panel";
 import { PresetButtons } from "@/components/app/preset-buttons";
+import { ReasoningPanel } from "@/components/app/reasoning-panel";
 import type { EnforcementResult } from "@/lib/api";
 
 export default function AppPage(): ReactNode {
@@ -69,6 +70,7 @@ export default function AppPage(): ReactNode {
                 {result.attestation && (
                   <AnchorPanel intentId={result.id} anchor={result.anchor} />
                 )}
+                <ReasoningPanel intentId={result.id} />
               </>
             )}
           </div>

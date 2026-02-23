@@ -71,6 +71,18 @@ export function AnchorPanel({ intentId, anchor: initialAnchor }: AnchorPanelProp
             <span className="text-sm font-semibold">Anchored on Canton</span>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-sg-teal/10 px-2.5 py-0.5 text-[10px] font-medium text-sg-teal">
+              Canton Global Synchronizer
+            </span>
+            <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-medium text-amber-400">
+              DynamoDB Immutable Ledger
+            </span>
+            <span className="rounded-full bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-medium text-purple-400">
+              AWS us-east-2
+            </span>
+          </div>
+
           <div className="space-y-2 rounded-xl border border-foreground/5 bg-background/40 p-4">
             <div>
               <p className="text-xs font-medium text-muted-foreground">commitment_id</p>
@@ -83,6 +95,10 @@ export function AnchorPanel({ intentId, anchor: initialAnchor }: AnchorPanelProp
             <div>
               <p className="text-xs font-medium text-muted-foreground">anchored_at</p>
               <p className="mt-0.5 font-mono text-xs text-foreground">{anchor.anchored_at}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">bundle_root_hash</p>
+              <p className="mt-0.5 break-all font-mono text-xs text-foreground">{anchor.bundle_root_hash}</p>
             </div>
           </div>
         </div>
