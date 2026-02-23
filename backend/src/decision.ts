@@ -1,0 +1,17 @@
+import type { ProofStepResult, DecisionRecord, Decision } from "./types";
+import { sha256 } from "./crypto";
+
+export function computeDecision(
+  steps: ProofStepResult[],
+  bundleRootHash: string
+): DecisionRecord {
+  const allPassed = steps.every((s) => s.pass);
+  const decision: Decision = allPassed ? "ALLOW" : "DENY";
+  const decisionHash = sha256(`${bundleRootHash}|${decision}`);
+
+  return {
+    decision,
+    decision_hash: decisionHash,
+    bundle_root_hash: bundleRootHash,
+  };
+}
