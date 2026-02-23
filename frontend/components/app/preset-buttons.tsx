@@ -54,11 +54,11 @@ export function PresetButtons({ onResult, loading, setLoading }: PresetButtonsPr
   }
 
   return (
-    <div className="rounded-2xl border border-foreground/5 bg-muted/10 p-5">
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-gray-500">
         Demo Presets
       </h2>
-      <p className="mb-4 text-xs text-muted-foreground/70">
+      <p className="mb-4 text-xs text-gray-400">
         Each button submits a preset settlement intent through the Canonical Proof Chain.
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -70,24 +70,24 @@ export function PresetButtons({ onResult, loading, setLoading }: PresetButtonsPr
             onClick={() => handlePreset(preset.id)}
             className={`group flex cursor-pointer flex-col items-start gap-1.5 rounded-xl border p-4 text-left transition-all duration-200 disabled:opacity-50 ${
               preset.expected === "ALLOW"
-                ? "border-sg-success/15 bg-sg-success/5 hover:border-sg-success/30 hover:bg-sg-success/10"
-                : "border-sg-deny/15 bg-sg-deny/5 hover:border-sg-deny/30 hover:bg-sg-deny/10"
+                ? "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100"
+                : "border-red-200 bg-red-50 hover:border-red-300 hover:bg-red-100"
             }`}
           >
             <div className="flex w-full items-center justify-between">
-              <span className="text-xs text-muted-foreground">{preset.assetType}</span>
+              <span className="text-xs text-gray-500">{preset.assetType}</span>
               <span
                 className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold ${
                   preset.expected === "ALLOW"
-                    ? "bg-sg-success/10 text-sg-success"
-                    : "bg-sg-deny/10 text-sg-deny"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-red-100 text-red-600"
                 }`}
               >
                 {preset.expected}
               </span>
             </div>
-            <span className="text-sm font-semibold text-foreground">{preset.label}</span>
-            <span className="text-xs text-muted-foreground/70">{preset.description}</span>
+            <span className="text-sm font-semibold text-gray-900">{preset.label}</span>
+            <span className="text-xs text-gray-400">{preset.description}</span>
           </button>
         ))}
       </div>
