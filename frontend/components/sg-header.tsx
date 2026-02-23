@@ -11,15 +11,13 @@ import { useState, type ReactNode } from "react";
 import { SGLogo } from "./sg-logo";
 
 const navLinks = [
-  { href: "#features", label: "Features" },
   { href: "#comparison", label: "How It Works" },
   { href: "#demo", label: "Demo" },
-  { href: "#messages", label: "For Teams" },
+  { href: "#verification", label: "Enforcement Flow" },
 ];
 
 const authLinks = [
-  { href: "#verification", label: "Verify" },
-  { href: "#cta", label: "Get Started" },
+  { href: "/app", label: "Launch Console" },
 ];
 
 export function SGHeader(): ReactNode {

@@ -162,7 +162,7 @@ export function SGComparison(): ReactNode {
             whileTap={{ scale: 0.98 }}
             className="rounded-full bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.2)]"
           >
-            Start Integration
+            Explore Integration Model
           </motion.button>
         </motion.div>
 

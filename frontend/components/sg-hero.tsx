@@ -123,10 +123,10 @@ export function SGHero(): ReactNode {
           </MagneticButton>
           <MagneticButton strength={0.25}>
             <Link
-              href="#features"
+              href="/app"
               className="focus-ring flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/5 px-8 py-4 text-base font-semibold text-foreground backdrop-blur-sm transition-all hover:border-foreground/20 hover:bg-foreground/10"
             >
-              Explore Features
+              Launch Enforcement Console
             </Link>
           </MagneticButton>
         </motion.div>

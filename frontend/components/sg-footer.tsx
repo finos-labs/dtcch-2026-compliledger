@@ -10,9 +10,9 @@ const footerCards = [
   {
     title: "Product",
     links: [
-      { text: "Features", href: "#features" },
+      { text: "How It Works", href: "#comparison" },
       { text: "Live Demo", href: "#demo" },
-      { text: "Verification Flow", href: "#verification" },
+      { text: "Enforcement Flow", href: "#verification" },
     ],
   },
   {
@@ -20,17 +20,15 @@ const footerCards = [
     links: [
       { text: "Documentation", href: "#", external: true },
       { text: "Architecture Overview", href: "#" },
-      { text: "Integration Guide", href: "#", external: true },
       { text: "API Reference", href: "#", external: true },
     ],
   },
   {
-    title: "Company",
+    title: "Project",
     links: [
-      { text: "About", href: "#" },
-      { text: "Blog", href: "#" },
-      { text: "Careers", href: "#", external: true },
-      { text: "Press", href: "#" },
+      { text: "GitHub", href: "https://github.com/finos-labs/dtcch-2026-compliledger", external: true },
+      { text: "FINOS", href: "https://www.finos.org", external: true },
+      { text: "DTCC", href: "https://www.dtcc.com", external: true },
     ],
   },
 ];
