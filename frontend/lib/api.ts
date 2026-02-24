@@ -1,4 +1,4 @@
-const API_BASE = "";
+const API_BASE = "/api";
 
 export interface ProofStep {
   step_name: string;
@@ -52,6 +52,41 @@ export interface AnchorRecord {
   attestation_hash: string;
 }
 
+export interface CantonTransaction {
+  transaction_id: string;
+  contract_id: string;
+  domain_id: string;
+  participant_id: string;
+  command_id: string;
+  workflow_id: string;
+  ledger_effective_time: string;
+  record_time: string;
+  template_id: string;
+  payload: Record<string, string>;
+}
+
+export interface CantonAnchorResponse {
+  anchored: boolean;
+  network?: string;
+  domain?: string;
+  participant?: string;
+  storage?: string;
+  anchor: AnchorRecord;
+  canton_transaction?: CantonTransaction;
+}
+
+export interface CantonNetworkStatus {
+  network: string;
+  domain: string;
+  participant: string;
+  status: string;
+  ledger_api: string;
+  daml_runtime: string;
+  commitment_table: string;
+  schema_version: string;
+  features: Record<string, boolean>;
+}
+
 export interface EnforcementResult {
   id: string;
   preset_id?: string;
@@ -81,7 +116,7 @@ export async function runPreset(presetId: string): Promise<EnforcementResult> {
   return res.json();
 }
 
-export async function anchorAttestation(intentId: string): Promise<{ anchored: boolean; anchor: AnchorRecord }> {
+export async function anchorAttestation(intentId: string): Promise<CantonAnchorResponse> {
   const res = await fetch(`${API_BASE}/v1/attestations/${intentId}/anchor`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,6 +124,14 @@ export async function anchorAttestation(intentId: string): Promise<{ anchored: b
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to anchor: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchCantonStatus(): Promise<CantonNetworkStatus> {
+  const res = await fetch(`${API_BASE}/v1/canton/status`);
+  if (!res.ok) {
+    throw new Error(`Canton status check failed: ${res.statusText}`);
   }
   return res.json();
 }

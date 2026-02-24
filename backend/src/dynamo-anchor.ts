@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
@@ -17,7 +18,7 @@ export async function anchorToDynamo(
 ): Promise<AnchorRecord> {
   const commitmentId = `canton-${uuidv4().slice(0, 8)}`;
   const anchoredAt = new Date().toISOString();
-  const txHash = `0x${Buffer.from(attestationHash + anchoredAt).toString("hex").slice(0, 64)}`;
+  const txHash = `0x${createHash("sha256").update(`${attestationHash}::${bundleRootHash}::${anchoredAt}`).digest("hex")}`;
 
   const item = {
     attestation_hash: attestationHash,

@@ -10,6 +10,7 @@ import { AnchorPanel } from "@/components/app/anchor-panel";
 import { VerifyPanel } from "@/components/app/verify-panel";
 import { PresetButtons } from "@/components/app/preset-buttons";
 import { ReasoningPanel } from "@/components/app/reasoning-panel";
+import { CantonStatus } from "@/components/app/canton-status";
 import type { EnforcementResult } from "@/lib/api";
 
 export default function AppPage(): ReactNode {
@@ -29,6 +30,9 @@ export default function AppPage(): ReactNode {
             Run a settlement intent through the Canonical Proof Chain. Select a
             preset scenario to begin.
           </p>
+          <div className="mt-4">
+            <CantonStatus />
+          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-12">

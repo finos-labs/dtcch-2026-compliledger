@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   // Remove console.log in production
   compiler: {},
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       {

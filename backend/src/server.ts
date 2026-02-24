@@ -11,6 +11,7 @@ import { issueAttestation, recomputeAttestationHash } from "./attestation";
 import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db";
 import { PRESETS } from "./presets";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
+import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
 import { generateComplianceReasoning } from "./bedrock-reasoning";
 
 const app = express();
@@ -236,7 +237,7 @@ app.post("/v1/verify", async (req, res) => {
   res.json(response);
 });
 
-// POST /v1/attestations/:id/anchor — Anchor an attestation on-chain (DynamoDB)
+// POST /v1/attestations/:id/anchor — Anchor attestation on Canton Network via commitment registry
 app.post("/v1/attestations/:id/anchor", async (req, res) => {
   const record = getIntent(req.params.id);
   if (!record) {
@@ -258,20 +259,22 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
   }
 
   try {
-    const anchor = await anchorToDynamo(
+    const result = await anchorToCantonLedger(
       record.bundle.bundle_root_hash,
       record.signed_attestation.attestation_hash,
       record.id,
       record.bundle.asset_type
     );
 
-    updateAnchor(record.id, anchor);
+    updateAnchor(record.id, result.anchor);
 
     res.json({
       anchored: true,
-      network: "canton-global-synchronizer",
-      storage: "dynamodb",
-      anchor,
+      network: result.network,
+      domain: result.domain,
+      participant: result.participant,
+      anchor: result.anchor,
+      canton_transaction: result.canton_transaction,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -321,9 +324,29 @@ app.get("/v1/public-key", (_req, res) => {
   res.json({ public_key: getPublicKeyB64(), key_id: "sg-demo-key-01" });
 });
 
+// GET /v1/canton/status — Canton Network connectivity and configuration
+app.get("/v1/canton/status", (_req, res) => {
+  res.json(getCantonNetworkStatus());
+});
+
+// GET /v1/canton/commitments/:attestationHash — Lookup a Canton commitment by attestation hash
+app.get("/v1/canton/commitments/:attestationHash", async (req, res) => {
+  try {
+    const result = await lookupCantonCommitment(req.params.attestationHash);
+    if (!result) {
+      res.status(404).json({ error: "Commitment not found on Canton" });
+      return;
+    }
+    res.json(result);
+  } catch (err: unknown) {
+    console.error("Canton lookup error:", err);
+    res.status(500).json({ error: "Canton lookup failed" });
+  }
+});
+
 // GET /health — Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "SettlementGuard", version: "0.1.0" });
+  res.json({ status: "ok", service: "SettlementGuard", version: "0.2.0" });
 });
 
 function getPresetDescription(id: string): string {

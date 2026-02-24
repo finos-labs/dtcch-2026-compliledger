@@ -1,0 +1,80 @@
+-- SettlementGuard Commitment Registry
+-- Canton Global Synchronizer — Daml Contract Model
+--
+-- This contract records immutable settlement proof commitments on the
+-- Canton Network. Only cryptographic hashes are stored on-chain;
+-- sensitive settlement data never leaves the originating environment.
+
+module CommitmentRegistry where
+
+import Daml.Script
+import DA.Time
+
+-- | A single commitment anchoring an attestation to Canton.
+template SettlementCommitment
+  with
+    operator       : Party              -- SettlementGuard operator
+    attestationHash : Text              -- SHA-256 of the signed attestation
+    bundleRootHash  : Text              -- SHA-256 Merkle root of proof bundle
+    intentId        : Text              -- UUID linking to off-chain intent
+    assetType       : Text              -- "tokenized_treasury" | "stablecoin"
+    schemaVersion   : Text              -- "sg-v1"
+    anchoredAt      : Time              -- UTC timestamp of anchoring
+  where
+    signatory operator
+
+    key (operator, attestationHash) : (Party, Text)
+    maintainer key._1
+
+    -- | No-op choice to verify the commitment exists on-chain.
+    -- Exercising this proves the contract is active and the
+    -- attestation was anchored.
+    nonconsuming choice VerifyCommitment : ContractId SettlementCommitment
+      with
+        verifier : Party
+      controller verifier
+      do
+        return self
+
+    -- | Archive the commitment (regulatory recall or correction).
+    -- Only the operator can archive.
+    choice RevokeCommitment : ()
+      controller operator
+      do
+        return ()
+
+-- | Audit log entry created each time a commitment is verified.
+template VerificationRecord
+  with
+    operator        : Party
+    verifier        : Party
+    attestationHash : Text
+    verifiedAt      : Time
+    commitmentCid   : ContractId SettlementCommitment
+  where
+    signatory operator
+    observer verifier
+
+-- | Setup script for initializing the commitment registry
+-- in a Canton sandbox environment.
+setup : Script ()
+setup = script do
+  operator <- allocateParty "SettlementGuard"
+  verifier <- allocateParty "Auditor"
+
+  now <- getTime
+
+  commitmentCid <- submit operator do
+    createCmd SettlementCommitment with
+      operator
+      attestationHash = "abc123...demo"
+      bundleRootHash  = "def456...demo"
+      intentId        = "00000000-0000-0000-0000-000000000000"
+      assetType       = "tokenized_treasury"
+      schemaVersion   = "sg-v1"
+      anchoredAt      = now
+
+  submit verifier do
+    exerciseCmd commitmentCid VerifyCommitment with verifier
+
+  pure ()
