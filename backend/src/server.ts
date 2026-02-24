@@ -156,6 +156,7 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
   res.status(201).json({
     id: intentId,
     preset_id: presetId,
+    intent,
     intent_hash: intentHash,
     received_at: receivedAt,
     bundle,

@@ -87,9 +87,21 @@ export interface CantonNetworkStatus {
   features: Record<string, boolean>;
 }
 
+export interface SettlementIntent {
+  asset_type: string;
+  issuer_name: string;
+  issuer_status: string;
+  asset_id: string;
+  classification: string;
+  custody_provider: string;
+  custody_valid: boolean;
+  reserve_ratio: number;
+}
+
 export interface EnforcementResult {
   id: string;
   preset_id?: string;
+  intent?: SettlementIntent;
   intent_hash: string;
   received_at: string;
   bundle: ProofBundle;

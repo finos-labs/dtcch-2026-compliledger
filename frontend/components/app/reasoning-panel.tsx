@@ -42,11 +42,11 @@ export const ReasoningPanel = forwardRef<{ triggerGenerate: () => void }, Reason
           <Brain className="h-4 w-4 text-purple-600" />
           <h2 className="text-sm font-semibold text-gray-900">AI Compliance Reasoning</h2>
           <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-            Claude 3 Haiku
+            Bedrock Nova Micro
           </span>
         </div>
         <p className="mb-4 text-xs text-gray-500">
-          Generate natural-language compliance analysis explaining each proof step result using Anthropic Claude on AWS Bedrock.
+          Generate natural-language compliance analysis explaining each proof step result using Amazon Nova Micro on AWS Bedrock.
         </p>
         <button
           type="button"
@@ -91,7 +91,7 @@ export const ReasoningPanel = forwardRef<{ triggerGenerate: () => void }, Reason
         <Brain className="h-4 w-4 text-purple-600" />
         <h2 className="text-sm font-semibold text-gray-900">AI Compliance Reasoning</h2>
         <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-          Claude 3 Haiku
+          Bedrock Nova Micro
         </span>
       </div>
 

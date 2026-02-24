@@ -24,7 +24,7 @@ SettlementGuard is a pre-finality enforcement layer that sits between a settleme
 | **Cryptography** | SHA-256 + Ed25519 | Bundle hashing, attestation signing, tx_hash derivation |
 | **Persistence** | DynamoDB (us-east-2) | Immutable commitment registry backing Canton ledger |
 | **Frontend** | Next.js 15 / React / Tailwind CSS | Enforcement console with real-time Canton status |
-| **Deployment** | Vercel (frontend) + EC2 (backend) | Production infrastructure |
+| **Deployment** | Vercel (frontend) + AWS EC2 (backend) | Production infrastructure |
 
 ---
 
@@ -136,7 +136,7 @@ Each step produces a SHA-256 hash of its normalized inputs. The chain never chan
 
 ## AI Compliance Reasoning
 
-SettlementGuard uses **Amazon Bedrock (Nova Micro)** to generate natural-language analysis:
+SettlementGuard uses **Amazon Bedrock (Amazon Nova Micro)** to generate natural-language analysis:
 
 - **Per-step explanations** — why each proof step passed or failed
 - **Risk assessment** — overall risk characterization

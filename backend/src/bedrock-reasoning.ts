@@ -2,7 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedroc
 import type { ProofStepResult, SettlementIntent } from "./types";
 
 const AWS_REGION = process.env.AWS_REGION || "us-east-2";
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || "us.anthropic.claude-3-haiku-20240307-v1:0";
+const MODEL_ID = process.env.BEDROCK_MODEL_ID || "us.amazon.nova-micro-v1:0";
 
 const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
 
@@ -28,12 +28,11 @@ export async function generateComplianceReasoning(
 
   try {
     const body = JSON.stringify({
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 1024,
+      inferenceConfig: { maxTokens: 1024 },
       messages: [
         {
           role: "user",
-          content: prompt,
+          content: [{ text: prompt }],
         },
       ],
     });
@@ -47,8 +46,8 @@ export async function generateComplianceReasoning(
 
     const response = await bedrockClient.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const text = responseBody.content?.[0]?.text
-      || responseBody.output?.message?.content?.[0]?.text
+    const text = responseBody.output?.message?.content?.[0]?.text
+      || responseBody.content?.[0]?.text
       || "";
 
     return parseResponse(text, steps);
