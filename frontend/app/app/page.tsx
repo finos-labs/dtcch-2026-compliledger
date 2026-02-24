@@ -15,10 +15,46 @@ import {
 } from "@/lib/api";
 
 const SCENARIOS = [
-  { id: "stablecoin-pass", label: "Stablecoin PASS", short: "ALLOW" },
-  { id: "treasury-pass", label: "Treasury PASS", short: "ALLOW" },
-  { id: "stablecoin-fail", label: "Stablecoin FAIL", short: "DENY" },
-  { id: "treasury-fail", label: "Treasury FAIL", short: "DENY" },
+  {
+    id: "stablecoin-pass",
+    label: "Stablecoin PASS",
+    short: "ALLOW" as const,
+    asset: "USDX-002",
+    amount: "$5,000,000",
+    issuer: "Regulated Stablecoin Corp",
+    scenario: "Stablecoin redemption with sufficient reserves (1.02 ratio), segregated custody, and active issuer.",
+    outcome: "All 4 checks pass. Attestation issued. Anchored to Canton.",
+  },
+  {
+    id: "treasury-pass",
+    label: "Treasury PASS",
+    short: "ALLOW" as const,
+    asset: "USTB-2026-002",
+    amount: "$10,000,000",
+    issuer: "US Treasury Digital Securities",
+    scenario: "Tokenized T-bill transfer. CUSIP verified, custody position available, not encumbered.",
+    outcome: "All 4 checks pass. Attestation issued. Anchored to Canton.",
+  },
+  {
+    id: "stablecoin-fail",
+    label: "Stablecoin FAIL",
+    short: "DENY" as const,
+    asset: "USDX-001",
+    amount: "$5,000,000",
+    issuer: "Regulated Stablecoin Corp",
+    scenario: "Reserve ratio 0.97 — below the required 1:1 threshold at time of settlement.",
+    outcome: "Backing check fails. No attestation. Settlement blocked.",
+  },
+  {
+    id: "treasury-fail",
+    label: "Treasury FAIL",
+    short: "DENY" as const,
+    asset: "USTB-2026-001",
+    amount: "$10,000,000",
+    issuer: "US Treasury Digital Securities",
+    scenario: "Custody position flagged as invalid — assets may be encumbered or insufficient.",
+    outcome: "Custody check fails. No attestation. Settlement blocked.",
+  },
 ];
 
 function formatTime(iso: string) {
@@ -36,7 +72,7 @@ export default function AppPage(): ReactNode {
   const [cantonStatus, setCantonStatus] = useState<CantonNetworkStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(false);
 
   useEffect(() => {
     fetchCantonStatus().then(setCantonStatus).catch(() => {});
@@ -148,12 +184,57 @@ export default function AppPage(): ReactNode {
           )}
         </div>
 
-        {/* Empty State */}
+        {/* Scenario Cards — Empty State */}
         {!result && !loading && (
-          <div className={`flex h-[500px] items-center justify-center rounded-xl border ${border} ${card}`}>
-            <div className="text-center">
-              <p className={`font-mono text-sm ${textDim}`}>Select a scenario to begin enforcement evaluation</p>
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {SCENARIOS.map((s) => {
+              const isAllow = s.short === "ALLOW";
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => handleRun(s.id)}
+                  disabled={loading}
+                  className={`group rounded-xl border p-5 text-left transition-all hover:shadow-md disabled:opacity-50 ${card} ${
+                    isAllow ? "hover:border-emerald-400" : "hover:border-red-400"
+                  }`}
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                        isAllow
+                          ? dark ? "bg-emerald-500/20" : "bg-emerald-100"
+                          : dark ? "bg-red-500/20" : "bg-red-100"
+                      }`}>
+                        {isAllow ? (
+                          <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={`text-sm font-semibold ${text}`}>{s.label}</span>
+                    </div>
+                    <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                      isAllow
+                        ? dark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
+                        : dark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-600"
+                    }`}>
+                      {s.short}
+                    </span>
+                  </div>
+                  <div className="mb-2 flex items-baseline gap-3">
+                    <span className={`font-mono text-xs ${mono}`}>{s.asset}</span>
+                    <span className={`text-xs font-semibold ${text}`}>{s.amount}</span>
+                  </div>
+                  <p className={`mb-2 text-xs leading-relaxed ${textMuted}`}>{s.scenario}</p>
+                  <p className={`text-[11px] ${textDim}`}>{s.outcome}</p>
+                </button>
+              );
+            })}
           </div>
         )}
 
