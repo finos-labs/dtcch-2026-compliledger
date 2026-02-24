@@ -43,22 +43,26 @@ export function CantonStatus(): ReactNode {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-emerald-200 bg-emerald-50/40 px-3.5 py-2">
       <div className="flex items-center gap-1.5">
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-        <span className="text-xs font-semibold text-emerald-700">Canton Connected</span>
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        </span>
+        <span className="text-[11px] font-semibold text-emerald-700">Canton Live</span>
       </div>
-      <div className="flex items-center gap-1.5">
-        <Globe className="h-3 w-3 text-gray-500" />
-        <span className="text-[11px] text-gray-600">{status.domain}</span>
+      <span className="hidden text-gray-300 sm:inline">|</span>
+      <div className="flex items-center gap-1">
+        <Globe className="h-3 w-3 text-gray-400" />
+        <span className="text-[10px] text-gray-500">{status.domain}</span>
       </div>
-      <div className="flex items-center gap-1.5">
-        <Server className="h-3 w-3 text-gray-500" />
-        <span className="text-[11px] text-gray-600">{status.participant}</span>
+      <div className="flex items-center gap-1">
+        <Server className="h-3 w-3 text-gray-400" />
+        <span className="text-[10px] text-gray-500">{status.participant}</span>
       </div>
-      <div className="flex items-center gap-1.5">
-        <Database className="h-3 w-3 text-gray-500" />
-        <span className="text-[11px] text-gray-600">{status.ledger_api}</span>
+      <div className="flex items-center gap-1">
+        <Database className="h-3 w-3 text-gray-400" />
+        <span className="text-[10px] text-gray-500">{status.ledger_api}</span>
       </div>
     </div>
   );
