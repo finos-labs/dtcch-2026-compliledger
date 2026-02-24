@@ -356,35 +356,102 @@ export default function AppPage(): ReactNode {
               {/* Anchor Status */}
               {attestation && (
                 <div className={`mt-4 border-t pt-3 ${border}`}>
-                  <h4 className={`mb-2 text-xs font-semibold ${text}`}>Anchor Status</h4>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h4 className={`text-xs font-semibold ${text}`}>Anchor Status</h4>
+                    {anchor && (
+                      <a
+                        href="https://canton.network/explorer"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Canton Explorer
+                      </a>
+                    )}
+                  </div>
                   {anchor ? (
-                    <div className="space-y-2">
-                      <p className={`text-xs font-medium ${mono}`}>Canton On-Chain Commitment</p>
-                      <Row label="Commitment ID" value={anchor.commitment_id} mono dark={dark} />
-                      <div>
-                        <p className={`mb-0.5 text-[10px] font-medium uppercase tracking-wider ${textDim}`}>Anchor Hash</p>
-                        <p className={`break-all font-mono text-[10px] ${mono}`}>{anchor.tx_hash}</p>
+                    <div className="space-y-2.5">
+                      <div className={`rounded-lg border p-3 ${stepBg}`}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500">
+                            <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                          <span className={`text-xs font-semibold ${mono}`}>Canton On-Chain Commitment</span>
+                        </div>
+                        <div className="ml-6 space-y-1.5">
+                          <div>
+                            <p className={`text-[9px] font-medium uppercase tracking-wider ${textDim}`}>Commitment ID</p>
+                            <p className={`font-mono text-xs font-semibold ${mono}`}>{anchor.commitment_id}</p>
+                          </div>
+                          <div>
+                            <p className={`text-[9px] font-medium uppercase tracking-wider ${textDim}`}>Anchor Hash</p>
+                            <p className={`break-all font-mono text-[10px] ${mono}`}>{anchor.tx_hash}</p>
+                          </div>
+                          <div className="flex items-baseline justify-between">
+                            <span className={`text-[9px] font-medium uppercase tracking-wider ${textDim}`}>Anchored At</span>
+                            <span className={`font-mono text-xs ${mono}`}>{formatTime(anchor.anchored_at)}</span>
+                          </div>
+                          <div className="flex items-baseline justify-between">
+                            <span className={`text-[9px] font-medium uppercase tracking-wider ${textDim}`}>Network</span>
+                            <span className={`font-mono text-[11px] ${mono}`}>{anchorData?.domain || "global-synchronizer.canton.network"}</span>
+                          </div>
+                        </div>
                       </div>
-                      <Row label="Anchored At" value={formatTime(anchor.anchored_at)} mono dark={dark} />
-                      <Row label="Network" value={anchorData?.domain || "global-synchronizer.canton.network"} mono dark={dark} />
+
                       {cantonTx && (
-                        <details className="mt-1">
-                          <summary className={`cursor-pointer text-[11px] font-medium ${mono}`}>
+                        <details className="group">
+                          <summary className={`flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold ${mono} select-none`}>
+                            <svg className="h-3 w-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
                             Canton Transaction Details
                           </summary>
-                          <div className={`mt-2 space-y-1.5 rounded-lg border p-3 ${stepBg}`}>
-                            <MiniRow label="transaction_id" value={truncHash(cantonTx.transaction_id, 30)} dark={dark} />
-                            <MiniRow label="contract_id" value={truncHash(cantonTx.contract_id, 30)} dark={dark} />
+                          <div className={`mt-2 space-y-2 rounded-lg border p-3 ${stepBg}`}>
+                            <MiniRow label="transaction_id" value={cantonTx.transaction_id} dark={dark} />
+                            <MiniRow label="contract_id" value={cantonTx.contract_id} dark={dark} />
                             <MiniRow label="domain_id" value={cantonTx.domain_id} dark={dark} />
                             <MiniRow label="participant_id" value={cantonTx.participant_id} dark={dark} />
                             <MiniRow label="template_id" value={cantonTx.template_id} dark={dark} />
                             <MiniRow label="workflow_id" value={cantonTx.workflow_id} dark={dark} />
+                            <MiniRow label="ledger_effective_time" value={cantonTx.ledger_effective_time} dark={dark} />
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <a
+                              href="https://docs.canton.network/en/canton/2.x/tutorials/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium ${dark ? "border-[#1e293b] text-gray-400 hover:text-emerald-400" : "border-gray-200 text-gray-500 hover:text-emerald-700"}`}
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Canton Docs
+                            </a>
+                            <a
+                              href="https://canton.network"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium ${dark ? "border-[#1e293b] text-gray-400 hover:text-emerald-400" : "border-gray-200 text-gray-500 hover:text-emerald-700"}`}
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+                              </svg>
+                              canton.network
+                            </a>
                           </div>
                         </details>
                       )}
                     </div>
                   ) : (
-                    <p className={`text-xs ${textDim}`}>Anchoring in progress...</p>
+                    <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${stepBg}`}>
+                      <span className="h-3 w-3 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
+                      <p className={`text-xs ${textDim}`}>Anchoring to Canton...</p>
+                    </div>
                   )}
                 </div>
               )}
@@ -392,20 +459,28 @@ export default function AppPage(): ReactNode {
               {/* AI Reasoning */}
               {reasoning && (
                 <div className={`mt-4 border-t pt-3 ${border}`}>
-                  <h4 className={`mb-2 flex items-center gap-2 text-xs font-semibold ${text}`}>
+                  <h4 className={`mb-3 flex items-center gap-2 text-xs font-semibold ${text}`}>
                     AI Compliance Reasoning
-                    <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-400">
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                      dark ? "bg-purple-500/20 text-purple-400" : "bg-purple-100 text-purple-700"
+                    }`}>
                       Bedrock Nova Micro
                     </span>
                   </h4>
-                  <p className={`mb-2 text-xs leading-relaxed ${textMuted}`}>{reasoning.summary}</p>
-                  <div className="space-y-1">
+                  <div className={`mb-3 rounded-lg border px-3 py-2.5 ${stepBg}`}>
+                    <p className={`text-xs leading-relaxed ${text}`}>{reasoning.summary}</p>
+                  </div>
+                  <div className="space-y-1.5">
                     {reasoning.step_explanations.map((s) => (
-                      <div key={s.step_name} className={`flex items-start gap-2 text-[11px] ${textMuted}`}>
-                        <span className={s.pass ? "text-emerald-500" : "text-red-400"}>
-                          {s.pass ? "+" : "-"}
+                      <div key={s.step_name} className={`flex items-start gap-2 text-[11px]`}>
+                        <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                          s.pass
+                            ? dark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
+                            : dark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-600"
+                        }`}>
+                          {s.pass ? "+" : "−"}
                         </span>
-                        <span>{s.explanation}</span>
+                        <span className={textMuted}>{s.explanation}</span>
                       </div>
                     ))}
                   </div>
