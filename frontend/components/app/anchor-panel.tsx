@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, forwardRef, useImperativeHandle, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Anchor, CheckCircle2, Loader2, Globe, Server, FileCode } from "lucide-react";
 import { anchorAttestation, type AnchorRecord, type CantonTransaction } from "@/lib/api";
@@ -10,14 +10,17 @@ interface AnchorPanelProps {
   anchor?: AnchorRecord | null;
 }
 
-export function AnchorPanel({ intentId, anchor: initialAnchor }: AnchorPanelProps): ReactNode {
+export const AnchorPanel = forwardRef<{ triggerAnchor: () => void }, AnchorPanelProps>(function AnchorPanel({ intentId, anchor: initialAnchor }, ref) {
   const [anchor, setAnchor] = useState<AnchorRecord | null>(initialAnchor || null);
   const [cantonTx, setCantonTx] = useState<CantonTransaction | null>(null);
   const [networkInfo, setNetworkInfo] = useState<{ domain: string; participant: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useImperativeHandle(ref, () => ({ triggerAnchor: handleAnchor }));
+
   async function handleAnchor() {
+    if (anchor) return;
     setLoading(true);
     setError(null);
     try {
@@ -168,4 +171,4 @@ export function AnchorPanel({ intentId, anchor: initialAnchor }: AnchorPanelProp
       )}
     </motion.div>
   );
-}
+});

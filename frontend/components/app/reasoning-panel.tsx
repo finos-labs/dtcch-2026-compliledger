@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, forwardRef, useImperativeHandle, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Brain, Loader2, CheckCircle2, XCircle, AlertTriangle, ArrowRight } from "lucide-react";
 import { fetchReasoning, type ComplianceReasoning } from "@/lib/api";
@@ -9,12 +9,15 @@ interface ReasoningPanelProps {
   intentId: string;
 }
 
-export function ReasoningPanel({ intentId }: ReasoningPanelProps): ReactNode {
+export const ReasoningPanel = forwardRef<{ triggerGenerate: () => void }, ReasoningPanelProps>(function ReasoningPanel({ intentId }, ref) {
   const [reasoning, setReasoning] = useState<ComplianceReasoning | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useImperativeHandle(ref, () => ({ triggerGenerate: handleGenerate }));
+
   async function handleGenerate() {
+    if (reasoning) return;
     setLoading(true);
     setError(null);
     try {
@@ -39,11 +42,11 @@ export function ReasoningPanel({ intentId }: ReasoningPanelProps): ReactNode {
           <Brain className="h-4 w-4 text-purple-600" />
           <h2 className="text-sm font-semibold text-gray-900">AI Compliance Reasoning</h2>
           <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-            Powered by Bedrock
+            Claude 3 Haiku
           </span>
         </div>
         <p className="mb-4 text-xs text-gray-500">
-          Generate natural-language compliance analysis explaining each proof step result using AI.
+          Generate natural-language compliance analysis explaining each proof step result using Anthropic Claude on AWS Bedrock.
         </p>
         <button
           type="button"
@@ -88,7 +91,7 @@ export function ReasoningPanel({ intentId }: ReasoningPanelProps): ReactNode {
         <Brain className="h-4 w-4 text-purple-600" />
         <h2 className="text-sm font-semibold text-gray-900">AI Compliance Reasoning</h2>
         <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-          Powered by Bedrock
+          Claude 3 Haiku
         </span>
       </div>
 
@@ -145,4 +148,4 @@ export function ReasoningPanel({ intentId }: ReasoningPanelProps): ReactNode {
       </div>
     </motion.div>
   );
-}
+});
