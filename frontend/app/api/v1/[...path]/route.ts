@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_API_URL || "http://3.133.118.100:3001";
+const BACKEND_URL = process.env.BACKEND_API_URL || "https://dtcc-backend-production.up.railway.app";
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
