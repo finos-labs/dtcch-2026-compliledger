@@ -2,6 +2,9 @@ import { createHash } from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
 import type { AnchorRecord } from "./types";
 
 const TABLE_NAME = process.env.DYNAMO_TABLE || "sg-commitment-registry";
@@ -10,15 +13,73 @@ const AWS_REGION = process.env.AWS_REGION || "us-east-2";
 const ddbClient = new DynamoDBClient({ region: AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 
+const ANCHOR_DB_PATH = path.join(__dirname, "..", "data", "anchors.db");
+let anchorDb: Database.Database | null = null;
+
+function getAnchorDb(): Database.Database {
+  if (!anchorDb) {
+    const dir = path.dirname(ANCHOR_DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    anchorDb = new Database(ANCHOR_DB_PATH);
+    anchorDb.pragma("journal_mode = WAL");
+    anchorDb.exec(`
+      CREATE TABLE IF NOT EXISTS anchors (
+        attestation_hash TEXT PRIMARY KEY,
+        bundle_root_hash TEXT NOT NULL,
+        commitment_id TEXT NOT NULL,
+        tx_hash TEXT NOT NULL,
+        intent_id TEXT NOT NULL,
+        asset_type TEXT NOT NULL,
+        anchored_at TEXT NOT NULL,
+        network TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_anchors_bundle ON anchors(bundle_root_hash);
+    `);
+  }
+  return anchorDb;
+}
+
+function buildAnchorFields(bundleRootHash: string, attestationHash: string, intentId: string) {
+  const commitmentId = `canton-${uuidv4().slice(0, 8)}`;
+  const anchoredAt = new Date().toISOString();
+  const txHash = `0x${createHash("sha256").update(`${attestationHash}::${bundleRootHash}::${anchoredAt}`).digest("hex")}`;
+  return { commitmentId, anchoredAt, txHash };
+}
+
+function anchorToSqlite(
+  bundleRootHash: string,
+  attestationHash: string,
+  intentId: string,
+  assetType: string
+): AnchorRecord {
+  const { commitmentId, anchoredAt, txHash } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
+  const db = getAnchorDb();
+  db.prepare(`
+    INSERT OR IGNORE INTO anchors (attestation_hash, bundle_root_hash, commitment_id, tx_hash, intent_id, asset_type, anchored_at, network)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(attestationHash, bundleRootHash, commitmentId, txHash, intentId, assetType, anchoredAt, "canton-global-synchronizer");
+  return { commitment_id: commitmentId, tx_hash: txHash, anchored_at: anchoredAt, bundle_root_hash: bundleRootHash, attestation_hash: attestationHash };
+}
+
+function lookupSqliteByAttestation(attestationHash: string): AnchorRecord | null {
+  const row = getAnchorDb().prepare("SELECT * FROM anchors WHERE attestation_hash = ?").get(attestationHash) as Record<string, string> | undefined;
+  if (!row) return null;
+  return { commitment_id: row.commitment_id, tx_hash: row.tx_hash, anchored_at: row.anchored_at, bundle_root_hash: row.bundle_root_hash, attestation_hash: row.attestation_hash };
+}
+
+function lookupSqliteByBundle(bundleRootHash: string): AnchorRecord | null {
+  const row = getAnchorDb().prepare("SELECT * FROM anchors WHERE bundle_root_hash = ? LIMIT 1").get(bundleRootHash) as Record<string, string> | undefined;
+  if (!row) return null;
+  return { commitment_id: row.commitment_id, tx_hash: row.tx_hash, anchored_at: row.anchored_at, bundle_root_hash: row.bundle_root_hash, attestation_hash: row.attestation_hash };
+}
+
 export async function anchorToDynamo(
   bundleRootHash: string,
   attestationHash: string,
   intentId: string,
   assetType: string
 ): Promise<AnchorRecord> {
-  const commitmentId = `canton-${uuidv4().slice(0, 8)}`;
-  const anchoredAt = new Date().toISOString();
-  const txHash = `0x${createHash("sha256").update(`${attestationHash}::${bundleRootHash}::${anchoredAt}`).digest("hex")}`;
+  const { commitmentId, anchoredAt, txHash } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
 
   const item = {
     attestation_hash: attestationHash,
@@ -31,13 +92,20 @@ export async function anchorToDynamo(
     network: "canton-global-synchronizer",
   };
 
-  await docClient.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: item,
-      ConditionExpression: "attribute_not_exists(attestation_hash)",
-    })
-  );
+  try {
+    await docClient.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: item,
+        ConditionExpression: "attribute_not_exists(attestation_hash)",
+      })
+    );
+  } catch (err: unknown) {
+    console.warn("DynamoDB write failed, using SQLite fallback:", (err as Error).message);
+    return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType);
+  }
+
+  anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType);
 
   return {
     commitment_id: commitmentId,
@@ -51,45 +119,53 @@ export async function anchorToDynamo(
 export async function lookupByAttestationHash(
   attestationHash: string
 ): Promise<AnchorRecord | null> {
-  const result = await docClient.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { attestation_hash: attestationHash },
-    })
-  );
-
-  if (!result.Item) return null;
-
-  return {
-    commitment_id: result.Item.commitment_id as string,
-    tx_hash: result.Item.tx_hash as string,
-    anchored_at: result.Item.anchored_at as string,
-    bundle_root_hash: result.Item.bundle_root_hash as string,
-    attestation_hash: result.Item.attestation_hash as string,
-  };
+  try {
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { attestation_hash: attestationHash },
+      })
+    );
+    if (result.Item) {
+      return {
+        commitment_id: result.Item.commitment_id as string,
+        tx_hash: result.Item.tx_hash as string,
+        anchored_at: result.Item.anchored_at as string,
+        bundle_root_hash: result.Item.bundle_root_hash as string,
+        attestation_hash: result.Item.attestation_hash as string,
+      };
+    }
+  } catch (err: unknown) {
+    console.warn("DynamoDB read failed, using SQLite fallback:", (err as Error).message);
+  }
+  return lookupSqliteByAttestation(attestationHash);
 }
 
 export async function lookupByBundleHash(
   bundleRootHash: string
 ): Promise<AnchorRecord | null> {
-  const result = await docClient.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: "bundle-index",
-      KeyConditionExpression: "bundle_root_hash = :hash",
-      ExpressionAttributeValues: { ":hash": bundleRootHash },
-      Limit: 1,
-    })
-  );
-
-  if (!result.Items || result.Items.length === 0) return null;
-
-  const item = result.Items[0];
-  return {
-    commitment_id: item.commitment_id as string,
-    tx_hash: item.tx_hash as string,
-    anchored_at: item.anchored_at as string,
-    bundle_root_hash: item.bundle_root_hash as string,
-    attestation_hash: item.attestation_hash as string,
-  };
+  try {
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        IndexName: "bundle-index",
+        KeyConditionExpression: "bundle_root_hash = :hash",
+        ExpressionAttributeValues: { ":hash": bundleRootHash },
+        Limit: 1,
+      })
+    );
+    if (result.Items && result.Items.length > 0) {
+      const item = result.Items[0];
+      return {
+        commitment_id: item.commitment_id as string,
+        tx_hash: item.tx_hash as string,
+        anchored_at: item.anchored_at as string,
+        bundle_root_hash: item.bundle_root_hash as string,
+        attestation_hash: item.attestation_hash as string,
+      };
+    }
+  } catch (err: unknown) {
+    console.warn("DynamoDB query failed, using SQLite fallback:", (err as Error).message);
+  }
+  return lookupSqliteByBundle(bundleRootHash);
 }
