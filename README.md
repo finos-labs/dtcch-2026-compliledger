@@ -4,254 +4,247 @@
 
 # SettlementGuard
 
-Deterministic, proof-based settlement enforcement — before finality.
+**Deterministic, proof-based settlement enforcement — before finality.**
 
-SettlementGuard is an enforcement layer that sits between a settlement intent and settlement finality. It deterministically evaluates compliance through a Canonical Proof Chain and either issues a cryptographically signed attestation or blocks settlement.
+> Live Demo: [https://settlement-guard.vercel.app](https://settlement-guard.vercel.app)  
+> Console: [https://settlement-guard.vercel.app/app](https://settlement-guard.vercel.app/app)
 
-It is not a settlement system.
-It is not a custody platform.
-It is not a compliance registry.
-
-It is the enforcement layer.
+SettlementGuard is a pre-finality enforcement layer that sits between a settlement intent and settlement finality on the **Canton Network**. It deterministically evaluates compliance through a Canonical Proof Chain, issues cryptographically signed attestations, and anchors immutable commitment records to Canton's Global Synchronizer.
 
 ---
 
-## The Core Shift
+## Technology Stack
 
-Traditional compliance relies on:
-- Post-trade audits
-- Periodic reviews
-- Manual attestations
-- Trust in record-keeping systems
-
-SettlementGuard replaces this model with:
-
-- Pre-finality enforcement
-- Deterministic cryptographic checks
-- Sealed proof bundles
-- On-chain commitment anchoring
-- Independent verification
-
-From trust → to proof.
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Smart Contract** | Daml (Canton Network) | `SettlementCommitment` / `VerificationRecord` templates |
+| **Ledger** | Canton Global Synchronizer | Append-only commitment anchoring via Daml Ledger API |
+| **Backend** | Node.js / Express / TypeScript | Proof chain evaluation, attestation issuance, Canton adapter |
+| **AI Reasoning** | AWS Bedrock (Amazon Nova Micro) | Natural-language compliance analysis of proof steps |
+| **Cryptography** | SHA-256 + Ed25519 | Bundle hashing, attestation signing, tx_hash derivation |
+| **Persistence** | DynamoDB (us-east-2) | Immutable commitment registry backing Canton ledger |
+| **Frontend** | Next.js 15 / React / Tailwind CSS | Enforcement console with real-time Canton status |
+| **Deployment** | Vercel (frontend) + EC2 (backend) | Production infrastructure |
 
 ---
 
-## System Overview
+## Canton Network Integration
 
-SettlementGuard integrates into the settlement flow as a pre-finality gate:
+SettlementGuard integrates with Canton through three layers:
 
-Settlement System  
-        ↓  
-Settlement Intent Submitted  
-        ↓  
-SettlementGuard (Canonical Proof Chain)  
-        ↓  
-Attestation Issued OR Settlement Blocked  
-        ↓  
-Canton Commitment (On-Chain Anchor)
+### 1. Daml Smart Contract (`daml/CommitmentRegistry.daml`)
 
-If and only if all deterministic checks pass:
-- A sealed proof bundle is generated
-- A signed settlement attestation is issued
-- The attestation hash is anchored to Canton
+```
+template SettlementCommitment
+  with
+    operator        : Party
+    attestationHash : Text       -- SHA-256 of the signed attestation
+    bundleRootHash  : Text       -- SHA-256 Merkle root of proof bundle
+    intentId        : Text       -- UUID linking to off-chain intent
+    assetType       : Text       -- "tokenized_treasury" | "stablecoin"
+    schemaVersion   : Text       -- "sg-v1"
+    anchoredAt      : Time
+```
 
-If any check fails:
-- No attestation is issued
-- No on-chain commitment occurs
-- Settlement does not proceed
+The contract supports:
+- **`VerifyCommitment`** — non-consuming choice proving the contract is active on-chain
+- **`RevokeCommitment`** — operator-only archive for regulatory recall
+- **`VerificationRecord`** — audit log created on each verification
+
+### 2. Canton Ledger API Adapter (`backend/src/canton-ledger.ts`)
+
+The adapter wraps commitment operations with Canton-compatible identifiers:
+
+- **`transaction_id`** — SHA-256 derived from attestation hash + timestamp
+- **`contract_id`** — deterministic derivation from attestation hash
+- **`domain_id`** — `global-synchronizer.canton.network`
+- **`participant_id`** — `sg-participant-01`
+- **`template_id`** — `CommitmentRegistry:SettlementCommitment`
+
+Each anchor operation produces a full Canton transaction record with workflow tracking.
+
+### 3. Canton Network Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/canton/status` | GET | Network connectivity, domain, participant, Daml runtime version |
+| `/v1/canton/commitments/:hash` | GET | Lookup commitment by attestation hash with Canton metadata |
+| `/v1/attestations/:id/anchor` | POST | Anchor attestation to Canton, returns full transaction record |
+
+---
+
+## How It Works
+
+```
+Settlement System
+        ↓
+Settlement Intent Submitted
+        ↓
+SettlementGuard (Canonical Proof Chain)
+   1. Issuer Legitimacy
+   2. Asset Classification
+   3. Custody Conditions
+   4. Reserve & Backing Validation
+        ↓
+Proof Bundle Sealed (SHA-256 root hash)
+        ↓
+Attestation Signed (Ed25519)
+        ↓
+Canton Commitment Anchored (Global Synchronizer)
+        ↓
+AI Compliance Reasoning Generated (Bedrock Nova Micro)
+```
+
+### Enforcement Flow
+
+**ALLOW** — all four proof steps pass:
+1. Proof bundle sealed with deterministic root hash
+2. Ed25519 attestation signed and bound to bundle hash
+3. Attestation hash anchored to Canton as `SettlementCommitment`
+4. AI generates natural-language compliance reasoning
+
+**DENY** — any proof step fails:
+1. No attestation issued
+2. No on-chain commitment
+3. Settlement blocked deterministically
 
 ---
 
 ## Canonical Proof Chain
 
-Every settlement attempt executes the same ordered sequence of checks:
+Every settlement intent executes the same ordered, deterministic sequence:
 
-1. Issuer Legitimacy  
-2. Asset Classification  
-3. Custody Conditions  
-4. Reserve & Backing Validation  
+| Step | Check | Inputs |
+|------|-------|--------|
+| 1 | **Issuer Legitimacy** | Issuer name, jurisdiction, license status |
+| 2 | **Asset Classification** | Asset type, regulatory category |
+| 3 | **Custody Conditions** | Custodian, segregation status, insurance |
+| 4 | **Reserve & Backing** | Reserve ratio, audit date, backing assets |
 
-The chain:
-- Never changes order
-- Produces reproducible results
-- Records every input and decision
-- Generates a deterministic bundle root hash
+Each step produces a SHA-256 hash of its normalized inputs. The chain never changes order and produces reproducible results.
 
 ---
 
-## Proof Bundle
+## Cryptographic Design
 
-Once all checks complete, results are sealed into a tamper-evident proof bundle.
-
-The bundle contains:
-- Settlement intent parameters
-- Check outcomes
-- Decision (ALLOW / DENY)
-- Timestamp
-- Bundle root hash (SHA-256)
-- Attestation signature (Ed25519)
-
-The bundle is the single source of proof.
-
-Any modification invalidates the signature.
+- **Bundle Root Hash**: SHA-256 over concatenated proof step hashes
+- **Attestation Signature**: Ed25519 over the attestation payload
+- **Transaction Hash**: `SHA-256(attestation_hash :: bundle_root_hash :: timestamp)` — cryptographically sound, not a simple encoding
+- **On-Chain Data**: Only hashes are committed to Canton. Sensitive settlement data never leaves the originating environment.
 
 ---
 
-## Cryptographic Attestation
+## AI Compliance Reasoning
 
-If all checks pass:
+SettlementGuard uses **Amazon Bedrock (Nova Micro)** to generate natural-language analysis:
 
-- SettlementGuard signs the proof bundle using Ed25519
-- The attestation is cryptographically bound to the bundle hash
-- The attestation hash is anchored to Canton
+- **Per-step explanations** — why each proof step passed or failed
+- **Risk assessment** — overall risk characterization
+- **Recommendation** — actionable next steps
+- **Summary** — concise compliance narrative
 
-This creates:
-
-- Machine-verifiable evidence
-- Tamper detection
-- Permanent timestamping
-- Independent validation capability
+The AI receives only proof chain results (no raw settlement data), maintaining data minimization.
 
 ---
 
-## Canton Commitment Anchoring
+## Project Structure
 
-SettlementGuard writes:
-
-- Proof bundle hash
-- Attestation hash
-
-to Canton as an immutable commitment.
-
-This provides:
-
-- Tamper-resistant timestamp
-- Independent verification
-- Regulatory-grade auditability
-- Cross-institution consistency
-
-Only cryptographic hashes are committed.
-Sensitive data never leaves the originating environment.
-
----
-
-## Independent Verification
-
-Any authorized party can verify:
-
-- Attestation signature validity
-- Bundle hash integrity
-- On-chain commitment existence
-
-Verification requires no trusted intermediary.
-
-Tampering is immediately detectable.
-
----
-
-## Deterministic Outcomes
-
-SettlementGuard produces binary results:
-
-ALLOW  
-→ Attestation issued  
-→ On-chain commitment recorded  
-
-DENY  
-→ No attestation  
-→ No settlement  
-
-There are no warnings.
-No partial states.
-No deferred compliance.
+```
+dtcch-2026-compliledger/
+├── daml/
+│   └── CommitmentRegistry.daml      # Daml smart contract for Canton
+├── backend/
+│   └── src/
+│       ├── server.ts                # Express API server
+│       ├── canton-ledger.ts         # Canton Ledger API adapter
+│       ├── dynamo-anchor.ts         # DynamoDB commitment storage
+│       ├── proof-chain.ts           # 4-step canonical proof chain
+│       ├── attestation.ts           # Ed25519 attestation issuance
+│       ├── bundle.ts                # Proof bundle sealing
+│       ├── crypto.ts                # SHA-256 + Ed25519 utilities
+│       ├── bedrock-reasoning.ts     # AI compliance reasoning
+│       ├── db.ts                    # SQLite intent persistence
+│       └── types.ts                 # Shared type definitions
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx                 # Landing page
+│   │   ├── app/page.tsx             # Enforcement console
+│   │   └── api/v1/[...path]/        # Server-side API proxy
+│   ├── components/app/
+│   │   ├── proof-chain-panel.tsx    # Proof chain visualization
+│   │   ├── attestation-panel.tsx    # Attestation display
+│   │   ├── anchor-panel.tsx         # Canton anchoring with tx details
+│   │   ├── verify-panel.tsx         # Independent verification
+│   │   ├── reasoning-panel.tsx      # AI reasoning display
+│   │   ├── canton-status.tsx        # Real-time Canton network status
+│   │   └── preset-buttons.tsx       # Scenario presets
+│   └── lib/
+│       └── api.ts                   # API client with Canton types
+└── README.md
+```
 
 ---
 
-## Architectural Principles
+## Running Locally
 
-- Deterministic, not rule-configurable
-- Enforcement, not monitoring
-- Proof production, not record-keeping
-- Pre-finality, not post-trade audit
-- Anchored commitments, not stored transactions
-- Independent verification, not audit trail review
+### Backend
 
----
+```bash
+cd backend
+npm install
+npm run build
+npm start          # Runs on http://localhost:3001
+```
 
-## Reference Architecture
+Required environment variables:
+```
+AWS_REGION=us-east-2
+DYNAMO_TABLE=sg-commitment-registry
+CANTON_DOMAIN=global-synchronizer.canton.network
+CANTON_PARTICIPANT=sg-participant-01
+```
 
-SettlementGuard runs off-chain in a secure enterprise environment.
+### Frontend
 
-- Proof evaluation: Off-chain
-- Bundle sealing: SHA-256
-- Attestation signing: Ed25519
-- Commitment anchoring: Canton
-- Verification: Independent, stateless
-
-The system is horizontally scalable and stateless at the proof layer.
+```bash
+cd frontend
+npm install
+BACKEND_API_URL=http://localhost:3001 npm run dev    # Runs on http://localhost:3000
+```
 
 ---
 
 ## Example Scenarios
 
-Treasury PASS  
-→ All four checks succeed  
-→ Attestation issued  
-→ Canton anchor confirmed  
-
-Treasury FAIL  
-→ Custody invalid  
-→ Settlement blocked  
-
-Stablecoin PASS  
-→ Reserve ratio ≥ 1.00  
-→ Attestation issued  
-
-Stablecoin FAIL  
-→ Insufficient reserves  
-→ No attestation  
+| Scenario | Asset Type | Decision | Canton Anchor |
+|----------|-----------|----------|---------------|
+| Treasury PASS | Tokenized Treasury | ALLOW | Committed |
+| Treasury FAIL | Tokenized Treasury | DENY | Not committed |
+| Stablecoin PASS | Stablecoin | ALLOW | Committed |
+| Stablecoin FAIL | Stablecoin | DENY | Not committed |
 
 ---
 
-## What SettlementGuard Is Not
+## Architectural Principles
 
-- Not a ledger
-- Not a registry
-- Not a dashboard
-- Not a policy engine
-- Not a monitoring tool
-
-It does not observe compliance.
-
-It enforces it.
-
----
-
-## Future Direction
-
-SettlementGuard is designed to support:
-
-- Tokenized Treasuries
-- Stablecoins
-- Tokenized securities
-- Real-world asset settlement
-- Institutional blockchain ecosystems
-
-The long-term vision is deterministic enforcement as a market standard.
+- **Deterministic** — same inputs always produce the same enforcement outcome
+- **Pre-finality** — enforcement happens before settlement, not after
+- **Proof-based** — every decision backed by cryptographic evidence
+- **Privacy-preserving** — only hashes anchored on-chain, no sensitive data
+- **Independently verifiable** — any party can verify attestation + on-chain commitment
+- **AI-augmented** — natural-language reasoning supplements deterministic proofs
 
 ---
 
 ## License
 
-[Add license here]
+Apache 2.0
 
 ---
 
-## Contact
+## Team
 
-For architecture discussions, integration models, or collaboration:
-
-[Add contact information]
+CompliLedger — Innovate.DTCC Hackathon 2026
 
 
 
