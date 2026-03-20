@@ -1,31 +1,60 @@
 # .gitignore
 #
 #   This file specifies intentionally untracked files that Git should ignore.
-#
-#   Alternatively, see the collection of .gitignore templates
-#       https://github.com/github/gitignore
 
-# macOS-specific
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+data/
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
-# Build directories
-dist
-site
-html
-plan.md
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-# Virtual environments
-venv
+# Temporary files
+*.tmp
+.cache/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Algorand
+*.teal.tok
+sandbox/
+
+# Archive
+archive/
 
 # Miscellaneous
-.idea
-.vscode
-
-# Python directories
-__pycache__
-*.pyc
-*.tmp
-.pytest_cache
-
-# MSFT Office
 ~$*.*
