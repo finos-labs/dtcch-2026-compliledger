@@ -1,5 +1,5 @@
-import type { SettlementIntent, ProofStepResult } from "./types";
-import { canonicalStringify, sha256 } from "./crypto";
+import type { SettlementIntent, ProofStepResult } from "../core/types";
+import { canonicalStringify, sha256 } from "../core/crypto";
 
 type ProofStep = (intent: SettlementIntent, index: number) => ProofStepResult;
 

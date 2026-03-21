@@ -1,5 +1,5 @@
-import type { Attestation, SignedAttestation, AssetType } from "./types";
-import { canonicalStringify, sha256, signData } from "./crypto";
+import type { Attestation, SignedAttestation, AssetType } from "../core/types";
+import { canonicalStringify, sha256, signData } from "../core/crypto";
 
 const ATTESTATION_VERSION = "sg-attest-v1";
 const SIGNER_NAME = "SettlementGuard";

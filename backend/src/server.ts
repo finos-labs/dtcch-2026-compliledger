@@ -2,17 +2,17 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
-import type { SettlementIntent, VerifyRequest, VerifyResponse, AnchorRecord } from "./types";
-import { canonicalStringify, sha256, verifySignature, getPublicKeyB64 } from "./crypto";
-import { executeProofChain } from "./proof-chain";
-import { sealBundle } from "./bundle";
-import { computeDecision } from "./decision";
-import { issueAttestation, recomputeAttestationHash } from "./attestation";
-import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db";
+import type { SettlementIntent, VerifyRequest, VerifyResponse, AnchorRecord } from "./core/types";
+import { canonicalStringify, sha256, verifySignature, getPublicKeyB64 } from "./core/crypto";
+import { executeProofChain } from "./governance/proof-chain";
+import { sealBundle } from "./core/bundle";
+import { computeDecision } from "./governance/decision";
+import { issueAttestation, recomputeAttestationHash } from "./governance/attestation";
+import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db/db";
 import { PRESETS } from "./presets";
-import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
-import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
-import { generateComplianceReasoning } from "./bedrock-reasoning";
+import { anchorToAlgorand, lookupByAttestationHash } from "./adapters/algorand-anchor";
+import { getAlgorandNetworkStatus, lookupAlgorandCommitment } from "./adapters/algorand-indexer";
+import { generateComplianceReasoning } from "./ai/bedrock-reasoning";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -238,7 +238,7 @@ app.post("/v1/verify", async (req, res) => {
   res.json(response);
 });
 
-// POST /v1/attestations/:id/anchor — Anchor attestation on Canton Network via commitment registry
+// POST /v1/attestations/:id/anchor — Anchor attestation to Algorand
 app.post("/v1/attestations/:id/anchor", async (req, res) => {
   const record = getIntent(req.params.id);
   if (!record) {
@@ -260,7 +260,7 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
   }
 
   try {
-    const result = await anchorToCantonLedger(
+    const result = await anchorToAlgorand(
       record.bundle.bundle_root_hash,
       record.signed_attestation.attestation_hash,
       record.id,
@@ -272,19 +272,13 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
     res.json({
       anchored: true,
       network: result.network,
-      domain: result.domain,
-      participant: result.participant,
       anchor: result.anchor,
-      canton_transaction: result.canton_transaction,
+      algorand_transaction: result.algorand_transaction,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    if (message.includes("ConditionalCheckFailedException")) {
-      res.status(409).json({ error: "Already anchored on-chain" });
-    } else {
-      console.error("Anchor error:", err);
-      res.status(500).json({ error: "Anchoring failed", details: message });
-    }
+    console.error("Anchor error:", err);
+    res.status(500).json({ error: "Anchoring failed", details: message });
   }
 });
 
@@ -325,23 +319,23 @@ app.get("/v1/public-key", (_req, res) => {
   res.json({ public_key: getPublicKeyB64(), key_id: "sg-demo-key-01" });
 });
 
-// GET /v1/canton/status — Canton Network connectivity and configuration
-app.get("/v1/canton/status", (_req, res) => {
-  res.json(getCantonNetworkStatus());
+// GET /v1/algorand/status — Algorand network connectivity and configuration
+app.get("/v1/algorand/status", (_req, res) => {
+  res.json(getAlgorandNetworkStatus());
 });
 
-// GET /v1/canton/commitments/:attestationHash — Lookup a Canton commitment by attestation hash
-app.get("/v1/canton/commitments/:attestationHash", async (req, res) => {
+// GET /v1/algorand/commitments/:attestationHash — Lookup an Algorand commitment by attestation hash
+app.get("/v1/algorand/commitments/:attestationHash", async (req, res) => {
   try {
-    const result = await lookupCantonCommitment(req.params.attestationHash);
+    const result = await lookupAlgorandCommitment(req.params.attestationHash);
     if (!result) {
-      res.status(404).json({ error: "Commitment not found on Canton" });
+      res.status(404).json({ error: "Commitment not found on Algorand" });
       return;
     }
     res.json(result);
   } catch (err: unknown) {
-    console.error("Canton lookup error:", err);
-    res.status(500).json({ error: "Canton lookup failed" });
+    console.error("Algorand lookup error:", err);
+    res.status(500).json({ error: "Algorand lookup failed" });
   }
 });
 

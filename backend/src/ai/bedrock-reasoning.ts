@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-import type { ProofStepResult, SettlementIntent } from "./types";
+import type { ProofStepResult, SettlementIntent } from "../core/types";
 
 const AWS_REGION = process.env.AWS_REGION || "us-east-2";
 const MODEL_ID = process.env.BEDROCK_MODEL_ID || "us.amazon.nova-micro-v1:0";

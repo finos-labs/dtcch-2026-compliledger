@@ -1,5 +1,5 @@
-import type { ProofStepResult, DecisionRecord, Decision } from "./types";
-import { sha256 } from "./crypto";
+import type { ProofStepResult, DecisionRecord, Decision } from "../core/types";
+import { sha256 } from "../core/crypto";
 
 export function computeDecision(
   steps: ProofStepResult[],
