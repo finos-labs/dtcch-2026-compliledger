@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
-import type { IntentRecord, AnchorRecord } from "./types";
+import type { IntentRecord, AnchorRecord } from "../core/types";
 
 const DB_PATH = path.join(__dirname, "..", "data", "settlementguard.db");
 
