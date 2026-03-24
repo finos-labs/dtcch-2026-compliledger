@@ -52,39 +52,27 @@ export interface AnchorRecord {
   attestation_hash: string;
 }
 
-export interface CantonTransaction {
-  transaction_id: string;
-  contract_id: string;
-  domain_id: string;
-  participant_id: string;
-  command_id: string;
-  workflow_id: string;
-  ledger_effective_time: string;
-  record_time: string;
-  template_id: string;
-  payload: Record<string, string>;
+export interface AlgorandTransaction {
+  txn_id: string;
+  confirmed_round: number;
+  app_id: number;
+  sender: string;
+  note: string;
+  timestamp: string;
 }
 
-export interface CantonAnchorResponse {
+export interface AlgorandAnchorResponse {
   anchored: boolean;
-  network?: string;
-  domain?: string;
-  participant?: string;
-  storage?: string;
+  network: string;
   anchor: AnchorRecord;
-  canton_transaction?: CantonTransaction;
+  algorand_transaction: AlgorandTransaction;
 }
 
-export interface CantonNetworkStatus {
+export interface AlgorandNetworkStatus {
   network: string;
-  domain: string;
-  participant: string;
-  status: string;
-  ledger_api: string;
-  daml_runtime: string;
-  commitment_table: string;
-  schema_version: string;
-  features: Record<string, boolean>;
+  node_url: string;
+  indexer_url: string;
+  connected: boolean;
 }
 
 export interface SettlementIntent {
@@ -128,7 +116,7 @@ export async function runPreset(presetId: string): Promise<EnforcementResult> {
   return res.json();
 }
 
-export async function anchorAttestation(intentId: string): Promise<CantonAnchorResponse> {
+export async function anchorAttestation(intentId: string): Promise<AlgorandAnchorResponse> {
   const res = await fetch(`${API_BASE}/v1/attestations/${intentId}/anchor`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -140,10 +128,10 @@ export async function anchorAttestation(intentId: string): Promise<CantonAnchorR
   return res.json();
 }
 
-export async function fetchCantonStatus(): Promise<CantonNetworkStatus> {
-  const res = await fetch(`${API_BASE}/v1/canton/status`);
+export async function fetchAlgorandStatus(): Promise<AlgorandNetworkStatus> {
+  const res = await fetch(`${API_BASE}/v1/algorand/status`);
   if (!res.ok) {
-    throw new Error(`Canton status check failed: ${res.statusText}`);
+    throw new Error(`Algorand status check failed: ${res.statusText}`);
   }
   return res.json();
 }

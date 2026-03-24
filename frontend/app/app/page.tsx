@@ -7,11 +7,11 @@ import {
   runPreset,
   anchorAttestation,
   fetchReasoning,
-  fetchCantonStatus,
+  fetchAlgorandStatus,
   type EnforcementResult,
-  type CantonAnchorResponse,
+  type AlgorandAnchorResponse,
   type ComplianceReasoning,
-  type CantonNetworkStatus,
+  type AlgorandNetworkStatus,
 } from "@/lib/api";
 
 const SCENARIOS = [
@@ -23,7 +23,7 @@ const SCENARIOS = [
     amount: "$5,000,000",
     issuer: "Regulated Stablecoin Corp",
     scenario: "Stablecoin redemption with sufficient reserves (1.02 ratio), segregated custody, and active issuer.",
-    outcome: "All 4 checks pass. Attestation issued. Anchored to Canton.",
+    outcome: "All 4 checks pass. Attestation issued. Anchored to Algorand.",
   },
   {
     id: "treasury-pass",
@@ -33,7 +33,7 @@ const SCENARIOS = [
     amount: "$10,000,000",
     issuer: "US Treasury Digital Securities",
     scenario: "Tokenized T-bill transfer. CUSIP verified, custody position available, not encumbered.",
-    outcome: "All 4 checks pass. Attestation issued. Anchored to Canton.",
+    outcome: "All 4 checks pass. Attestation issued. Anchored to Algorand.",
   },
   {
     id: "stablecoin-fail",
@@ -67,15 +67,15 @@ function truncHash(h: string, n = 20) {
 
 export default function AppPage(): ReactNode {
   const [result, setResult] = useState<EnforcementResult | null>(null);
-  const [anchorData, setAnchorData] = useState<CantonAnchorResponse | null>(null);
+  const [anchorData, setAnchorData] = useState<AlgorandAnchorResponse | null>(null);
   const [reasoning, setReasoning] = useState<ComplianceReasoning | null>(null);
-  const [cantonStatus, setCantonStatus] = useState<CantonNetworkStatus | null>(null);
+  const [algorandStatus, setAlgorandStatus] = useState<AlgorandNetworkStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
-    fetchCantonStatus().then(setCantonStatus).catch(() => {});
+    fetchAlgorandStatus().then(setAlgorandStatus).catch(() => {});
   }, []);
 
   async function handleRun(presetId: string) {
@@ -114,7 +114,7 @@ export default function AppPage(): ReactNode {
   const decision = result?.decision;
   const attestation = result?.attestation;
   const anchor = anchorData?.anchor;
-  const cantonTx = anchorData?.canton_transaction;
+  const algorandTx = anchorData?.algorand_transaction;
 
   return (
     <div className={`${bg} min-h-screen transition-colors duration-300`}>
@@ -125,8 +125,8 @@ export default function AppPage(): ReactNode {
         <div className="mx-auto flex h-10 max-w-[1400px] items-center justify-between px-4 text-[11px]">
           <div className="flex items-center gap-4">
             <span className={textMuted}>Environment: <span className={text}>Production</span></span>
-            <span className={textMuted}>Canton Participant ID: <span className={mono}>
-              {cantonStatus?.participant || "sg-participant-01"}
+            <span className={textMuted}>Algorand Network: <span className={mono}>
+              {algorandStatus?.network || "testnet"}
             </span></span>
           </div>
           <div className="flex items-center gap-4">
@@ -249,7 +249,7 @@ export default function AppPage(): ReactNode {
                 <Row label="Asset Type" value={intent?.asset_type === "tokenized_treasury" ? "Tokenized Treasury" : "Stablecoin"} dark={dark} />
                 <Row label="Asset Symbol" value={intent?.asset_id || "—"} mono dark={dark} />
                 <Row label="Amount" value={intent?.asset_type === "stablecoin" ? "$5,000,000" : "$10,000,000"} dark={dark} />
-                <Row label="Venue" value="Canton Clearing" dark={dark} />
+                <Row label="Venue" value="Algorand Settlement" dark={dark} />
                 <Row label="Timestamp" value={formatTime(result.received_at)} mono dark={dark} />
               </div>
               <div className={`mt-4 border-t pt-3 ${border}`}>
@@ -360,7 +360,7 @@ export default function AppPage(): ReactNode {
                     <h4 className={`text-xs font-semibold ${text}`}>Anchor Status</h4>
                     {anchor && (
                       <a
-                        href="https://canton.network/explorer"
+                        href="https://testnet.algoexplorer.io"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
@@ -368,7 +368,7 @@ export default function AppPage(): ReactNode {
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
-                        Canton Explorer
+                        Algorand Explorer
                       </a>
                     )}
                   </div>
@@ -381,7 +381,7 @@ export default function AppPage(): ReactNode {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                           </span>
-                          <span className={`text-xs font-semibold ${mono}`}>Canton On-Chain Commitment</span>
+                          <span className={`text-xs font-semibold ${mono}`}>Algorand On-Chain Commitment</span>
                         </div>
                         <div className="ml-6 space-y-1.5">
                           <div>
@@ -398,31 +398,29 @@ export default function AppPage(): ReactNode {
                           </div>
                           <div className="flex items-baseline justify-between">
                             <span className={`text-[9px] font-medium uppercase tracking-wider ${textDim}`}>Network</span>
-                            <span className={`font-mono text-[11px] ${mono}`}>{anchorData?.domain || "global-synchronizer.canton.network"}</span>
+                            <span className={`font-mono text-[11px] ${mono}`}>{anchorData?.network || "testnet"}</span>
                           </div>
                         </div>
                       </div>
 
-                      {cantonTx && (
+                      {algorandTx && (
                         <details className="group">
                           <summary className={`flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold ${mono} select-none`}>
                             <svg className="h-3 w-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
-                            Canton Transaction Details
+                            Algorand Transaction Details
                           </summary>
                           <div className={`mt-2 space-y-2 rounded-lg border p-3 ${stepBg}`}>
-                            <MiniRow label="transaction_id" value={cantonTx.transaction_id} dark={dark} />
-                            <MiniRow label="contract_id" value={cantonTx.contract_id} dark={dark} />
-                            <MiniRow label="domain_id" value={cantonTx.domain_id} dark={dark} />
-                            <MiniRow label="participant_id" value={cantonTx.participant_id} dark={dark} />
-                            <MiniRow label="template_id" value={cantonTx.template_id} dark={dark} />
-                            <MiniRow label="workflow_id" value={cantonTx.workflow_id} dark={dark} />
-                            <MiniRow label="ledger_effective_time" value={cantonTx.ledger_effective_time} dark={dark} />
+                            <MiniRow label="txn_id" value={algorandTx.txn_id} dark={dark} />
+                            <MiniRow label="confirmed_round" value={algorandTx.confirmed_round.toString()} dark={dark} />
+                            <MiniRow label="app_id" value={algorandTx.app_id.toString()} dark={dark} />
+                            <MiniRow label="sender" value={algorandTx.sender} dark={dark} />
+                            <MiniRow label="timestamp" value={algorandTx.timestamp} dark={dark} />
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <a
-                              href="https://docs.canton.network/en/canton/2.x/tutorials/"
+                              href="https://developer.algorand.org/docs/"
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium ${dark ? "border-[#1e293b] text-gray-400 hover:text-emerald-400" : "border-gray-200 text-gray-500 hover:text-emerald-700"}`}
@@ -430,18 +428,18 @@ export default function AppPage(): ReactNode {
                               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
-                              Canton Docs
+                              Algorand Docs
                             </a>
                             <a
-                              href="https://canton.network"
+                              href="https://algorand.com"
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium ${dark ? "border-[#1e293b] text-gray-400 hover:text-emerald-400" : "border-gray-200 text-gray-500 hover:text-emerald-700"}`}
                             >
                               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
-                              canton.network
+                              Algorand
                             </a>
                           </div>
                         </details>
@@ -450,7 +448,7 @@ export default function AppPage(): ReactNode {
                   ) : (
                     <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${stepBg}`}>
                       <span className="h-3 w-3 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
-                      <p className={`text-xs ${textDim}`}>Anchoring to Canton...</p>
+                      <p className={`text-xs ${textDim}`}>Anchoring to Algorand...</p>
                     </div>
                   )}
                 </div>
