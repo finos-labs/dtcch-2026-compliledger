@@ -1,18 +1,18 @@
 import type { Rule } from "../types";
 
-/**
- * ISLA collateral eligibility rule: verifies that posted collateral is
- * eligible under ISLA Global Master Securities Lending Agreement (GMSLA) terms.
- */
 export const islaCollateralRule: Rule = {
-  id: "ISLA_COLLATERAL_001",
-  evaluate(input: { collateral_eligible?: boolean; collateral_type?: string }) {
-    if (input.collateral_eligible === undefined || input.collateral_eligible === null) {
-      return { passed: false, reason_code: "COLLATERAL_ELIGIBILITY_MISSING" };
+  id: "ISLA_COLLATERAL_COVERAGE",
+  evaluate(input: { collateral_value?: unknown; loan_value?: unknown; haircut?: unknown }) {
+    const collateralValue = Number(input.collateral_value);
+    const loanValue = Number(input.loan_value);
+    const haircut = Number(input.haircut);
+    if (isNaN(collateralValue) || isNaN(loanValue) || isNaN(haircut)) {
+      return { passed: false, reason_code: "INSUFFICIENT_COLLATERAL" };
     }
-    if (!input.collateral_eligible) {
-      return { passed: false, reason_code: "COLLATERAL_NOT_ELIGIBLE" };
+    const requiredCoverage = loanValue * (1 + haircut);
+    if (collateralValue >= requiredCoverage) {
+      return { passed: true };
     }
-    return { passed: true };
+    return { passed: false, reason_code: "INSUFFICIENT_COLLATERAL" };
   },
 };
