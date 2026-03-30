@@ -1,4 +1,7 @@
 import type { Rule } from "../rules/types";
+import { isdaMarginRule } from "../rules/isda/margin";
+import { islaCollateralRule } from "../rules/isla/collateral";
+import { icmaRepoRule } from "../rules/icma/repo";
 
 /**
  * Central registry that stores and retrieves Rule instances by their id.
@@ -20,3 +23,9 @@ export class RuleRegistry {
 }
 
 export const defaultRegistry = new RuleRegistry();
+
+export const ruleRegistry = {
+  ISDA: [isdaMarginRule],
+  ISLA: [islaCollateralRule],
+  ICMA: [icmaRepoRule],
+};
