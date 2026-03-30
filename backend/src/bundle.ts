@@ -1,4 +1,4 @@
-import type { SettlementIntent, ProofStepResult, ProofBundle, OssEvaluation } from "./types";
+import type { SettlementIntent, ProofStepResult, ProofBundle, OssEvaluation, SettlementDecisionResult } from "./types";
 import { canonicalStringify, sha256 } from "./crypto";
 
 const BUNDLE_VERSION = "sg-v1";
@@ -8,7 +8,8 @@ export function sealBundle(
   receivedAt: string,
   intent: SettlementIntent,
   steps: ProofStepResult[],
-  ossEvaluation?: OssEvaluation
+  ossEvaluation?: OssEvaluation,
+  settlementDecision?: SettlementDecisionResult
 ): ProofBundle {
   const bundle: Omit<ProofBundle, "bundle_root_hash"> = {
     bundle_version: BUNDLE_VERSION,
@@ -17,6 +18,7 @@ export function sealBundle(
     received_at: receivedAt,
     steps,
     ...(ossEvaluation && { oss_evaluation: ossEvaluation }),
+    ...(settlementDecision && { settlement_decision: settlementDecision }),
   };
 
   const bundleRootHash = sha256(canonicalStringify(bundle));
