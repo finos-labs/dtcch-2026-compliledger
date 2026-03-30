@@ -1,0 +1,8 @@
+{
+  "rule_pack": "ICMA",
+  "payload": {
+    "purchase_price": 1000000,
+    "collateral_value": 1050000,
+    "haircut": 0.02
+  }
+}

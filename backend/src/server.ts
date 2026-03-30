@@ -15,12 +15,21 @@ import { evaluateRules } from "./engine/decisionProvider";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
 import { generateComplianceReasoning } from "./bedrock-reasoning";
+import { evaluate, type RulePack } from "./engine/ossRuleEvaluator";
+import type { OssEvaluation } from "./types";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+/** Extract and run an optional OSS rule evaluation from a request body. */
+function resolveOssEvaluation(body: Record<string, unknown>): OssEvaluation | undefined {
+  const rulePack = body.rule_pack as RulePack | undefined;
+  const rulePackPayload = body.rule_pack_payload as Record<string, unknown> | undefined;
+  return rulePack && rulePackPayload ? evaluate(rulePack, rulePackPayload) : undefined;
+}
 
 function validateIntent(body: unknown): { valid: boolean; error?: string; intent?: SettlementIntent } {
   const b = body as Record<string, unknown>;
@@ -71,8 +80,11 @@ app.post("/v1/intents", (req, res) => {
   // Execute the Canonical Proof Chain
   const steps = executeProofChain(intent);
 
-  // Seal the proof bundle
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps);
+  // Optional OSS rule evaluation — runs when the caller supplies rule_pack + rule_pack_payload
+  const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
+
+  // Seal the proof bundle (oss_evaluation is included before hashing when present)
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
 
   // Compute decision
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
@@ -130,7 +142,11 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
   const intentHash = sha256(canonicalStringify(intent));
 
   const steps = executeProofChain(intent);
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps);
+
+  // Optional OSS rule evaluation — callers may supply rule_pack + rule_pack_payload
+  const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
+
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;
@@ -394,6 +410,24 @@ app.post("/v1/demo/evaluate", (req, res) => {
     console.error(`Evaluate error for rule_pack ${rule_pack}:`, err);
     res.status(500).json({ error: "Evaluation failed" });
   }
+// POST /v1/demo/evaluate — Evaluate a standalone OSS rule snippet (ISDA / ISLA / ICMA)
+app.post("/v1/demo/evaluate", (req, res) => {
+  const body = req.body as Record<string, unknown>;
+  const rulePack = body.rule_pack as RulePack | undefined;
+  const payload = body.payload as Record<string, unknown> | undefined;
+
+  if (!rulePack || !payload) {
+    res.status(400).json({ error: "rule_pack and payload are required" });
+    return;
+  }
+
+  if (!["ISDA", "ISLA", "ICMA"].includes(rulePack)) {
+    res.status(400).json({ error: "rule_pack must be one of: ISDA, ISLA, ICMA" });
+    return;
+  }
+
+  const result = evaluate(rulePack, payload);
+  res.json(result);
 });
 
 // GET /health — Health check
