@@ -2,6 +2,7 @@ import type { Rule } from "../rules/types";
 import { isdaCounterpartyRule } from "../rules/isda/counterparty";
 import { isdaMarginRule } from "../rules/isda/margin";
 import { islaCollateralRule } from "../rules/isla/collateral";
+import { islaEligibilityRule } from "../rules/isla/eligibility";
 import { icmaRepoRule } from "../rules/icma/repo";
 import { icmaMaturityRule } from "../rules/icma/maturity";
 
@@ -27,6 +28,9 @@ export class RuleRegistry {
 export const defaultRegistry = new RuleRegistry();
 
 export const ruleRegistry = {
+  ISDA: [isdaMarginRule],
+  ISLA: [islaEligibilityRule, islaCollateralRule],
+  ICMA: [icmaRepoRule],
   ISDA: [isdaCounterpartyRule, isdaMarginRule],
   ISLA: [islaCollateralRule],
   ICMA: [icmaRepoRule, icmaMaturityRule],
