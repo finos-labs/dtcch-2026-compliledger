@@ -361,6 +361,26 @@ app.get("/v1/canton/commitments/:attestationHash", async (req, res) => {
   }
 });
 
+// POST /v1/demo/evaluate — Evaluate a standalone OSS rule snippet (ISDA / ISLA / ICMA)
+app.post("/v1/demo/evaluate", (req, res) => {
+  const body = req.body as Record<string, unknown>;
+  const rulePack = body.rule_pack as RulePack | undefined;
+  const payload = body.payload as Record<string, unknown> | undefined;
+
+  if (!rulePack || !payload) {
+    res.status(400).json({ error: "rule_pack and payload are required" });
+    return;
+  }
+
+  if (!["ISDA", "ISLA", "ICMA"].includes(rulePack)) {
+    res.status(400).json({ error: "rule_pack must be one of: ISDA, ISLA, ICMA" });
+    return;
+  }
+
+  const result = evaluate(rulePack, payload);
+  res.json(result);
+});
+
 // GET /health — Health check
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "SettlementGuard", version: "0.2.0" });

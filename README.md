@@ -151,6 +151,93 @@ Each step produces a SHA-256 hash of its normalized inputs. The chain never chan
 
 ---
 
+## Open-Source Rule Snippet Layer
+
+This repository includes lightweight example rules aligned to three major industry standards:
+
+- **ISDA** — margin sufficiency check (`ISDA_MARGIN_SUFFICIENCY`): verifies that posted collateral value meets or exceeds the required margin threshold.
+- **ISLA** — collateral coverage check (`ISLA_COLLATERAL_COVERAGE`): verifies that collateral value covers the loan value after applying a haircut.
+- **ICMA** — repo collateral sufficiency check (`ICMA_REPO_COLLATERAL_SUFFICIENCY`): verifies that collateral value covers the purchase price after applying a haircut.
+
+**Important caveats:**
+
+- These are **reference snippets only** — they demonstrate how standards-aligned settlement decisioning can be encoded, not full legal or production-grade rule packs.
+- They are intended to illustrate the integration pattern between an industry standard and the SettlementGuard proof chain.
+- Advanced rule orchestration, commercial logic, and full standards compliance remain **out of scope** for the open-source layer.
+
+### Demo Evaluation API
+
+The `POST /v1/demo/evaluate` endpoint provides a standalone entry point for testing the OSS rule snippets without submitting a full settlement intent.
+
+**Request body:**
+
+```json
+{
+  "rule_pack": "ISDA | ISLA | ICMA",
+  "payload": { ... }
+}
+```
+
+**Example: ISDA margin check** (`examples/isda-margin.json`)
+
+```bash
+curl -X POST http://localhost:3001/v1/demo/evaluate \
+  -H "Content-Type: application/json" \
+  -d @examples/isda-margin.json
+```
+
+```json
+{
+  "rule_pack": "ISDA",
+  "payload": {
+    "required_margin": 100000,
+    "posted_collateral_value": 110000
+  }
+}
+```
+
+**Example: ISLA collateral coverage** (`examples/isla-collateral.json`)
+
+```bash
+curl -X POST http://localhost:3001/v1/demo/evaluate \
+  -H "Content-Type: application/json" \
+  -d @examples/isla-collateral.json
+```
+
+```json
+{
+  "rule_pack": "ISLA",
+  "payload": {
+    "collateral_value": 1050000,
+    "loan_value": 1000000,
+    "haircut": 0.02
+  }
+}
+```
+
+**Example: ICMA repo collateral sufficiency** (`examples/icma-repo.json`)
+
+```bash
+curl -X POST http://localhost:3001/v1/demo/evaluate \
+  -H "Content-Type: application/json" \
+  -d @examples/icma-repo.json
+```
+
+```json
+{
+  "rule_pack": "ICMA",
+  "payload": {
+    "purchase_price": 1000000,
+    "collateral_value": 1050000,
+    "haircut": 0.02
+  }
+}
+```
+
+A passing evaluation returns `"decision": "ALLOW"` with an empty `reason_codes` array. A failing evaluation returns `"decision": "DENY"` with one or more reason codes identifying which rule was not satisfied.
+
+---
+
 ## Project Structure
 
 ```
@@ -166,7 +253,18 @@ settlementguard/
 │       ├── crypto.ts                # SHA-256 + Ed25519 utilities
 │       ├── bedrock-reasoning.ts     # Amazon Nova Micro AI reasoning
 │       ├── db.ts                    # SQLite intent persistence
-│       └── types.ts                 # Shared type definitions
+│       ├── types.ts                 # Shared type definitions
+│       ├── engine/
+│       │   ├── ossRuleEvaluator.ts  # OSS rule evaluation entry point
+│       │   └── ruleRegistry.ts      # Rule pack registry (ISDA, ISLA, ICMA)
+│       └── rules/
+│           ├── isda/margin.ts       # ISDA margin sufficiency snippet
+│           ├── isla/collateral.ts   # ISLA collateral coverage snippet
+│           └── icma/repo.ts         # ICMA repo collateral sufficiency snippet
+├── examples/
+│   ├── isda-margin.json             # Example payload for ISDA margin check
+│   ├── isla-collateral.json         # Example payload for ISLA collateral coverage
+│   └── icma-repo.json               # Example payload for ICMA repo check
 ├── frontend/
 │   ├── app/
 │   │   ├── page.tsx                 # Landing page

@@ -1,0 +1,7 @@
+{
+  "rule_pack": "ISDA",
+  "payload": {
+    "required_margin": 100000,
+    "posted_collateral_value": 110000
+  }
+}

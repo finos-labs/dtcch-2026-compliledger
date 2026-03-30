@@ -1,8 +1,10 @@
 import type { Rule } from "../rules/types";
+import { isdaCounterpartyRule } from "../rules/isda/counterparty";
 import { isdaMarginRule } from "../rules/isda/margin";
 import { islaCollateralRule } from "../rules/isla/collateral";
 import { islaEligibilityRule } from "../rules/isla/eligibility";
 import { icmaRepoRule } from "../rules/icma/repo";
+import { icmaMaturityRule } from "../rules/icma/maturity";
 
 /**
  * Central registry that stores and retrieves Rule instances by their id.
@@ -29,4 +31,7 @@ export const ruleRegistry = {
   ISDA: [isdaMarginRule],
   ISLA: [islaEligibilityRule, islaCollateralRule],
   ICMA: [icmaRepoRule],
+  ISDA: [isdaCounterpartyRule, isdaMarginRule],
+  ISLA: [islaCollateralRule],
+  ICMA: [icmaRepoRule, icmaMaturityRule],
 };

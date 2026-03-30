@@ -1,0 +1,8 @@
+{
+  "rule_pack": "ISLA",
+  "payload": {
+    "collateral_value": 1050000,
+    "loan_value": 1000000,
+    "haircut": 0.02
+  }
+}
