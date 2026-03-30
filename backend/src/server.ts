@@ -372,7 +372,7 @@ app.post("/v1/demo/evaluate", (req, res) => {
     return;
   }
 
-  if (!(rulePack in { ISDA: 1, ISLA: 1, ICMA: 1 })) {
+  if (!["ISDA", "ISLA", "ICMA"].includes(rulePack)) {
     res.status(400).json({ error: "rule_pack must be one of: ISDA, ISLA, ICMA" });
     return;
   }
