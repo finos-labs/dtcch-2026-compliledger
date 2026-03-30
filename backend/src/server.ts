@@ -13,12 +13,21 @@ import { PRESETS } from "./presets";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
 import { generateComplianceReasoning } from "./bedrock-reasoning";
+import { evaluate, type RulePack } from "./engine/ossRuleEvaluator";
+import type { OssEvaluation } from "./types";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+/** Extract and run an optional OSS rule evaluation from a request body. */
+function resolveOssEvaluation(body: Record<string, unknown>): OssEvaluation | undefined {
+  const rulePack = body.rule_pack as RulePack | undefined;
+  const rulePackPayload = body.rule_pack_payload as Record<string, unknown> | undefined;
+  return rulePack && rulePackPayload ? evaluate(rulePack, rulePackPayload) : undefined;
+}
 
 function validateIntent(body: unknown): { valid: boolean; error?: string; intent?: SettlementIntent } {
   const b = body as Record<string, unknown>;
@@ -69,8 +78,11 @@ app.post("/v1/intents", (req, res) => {
   // Execute the Canonical Proof Chain
   const steps = executeProofChain(intent);
 
-  // Seal the proof bundle
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps);
+  // Optional OSS rule evaluation — runs when the caller supplies rule_pack + rule_pack_payload
+  const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
+
+  // Seal the proof bundle (oss_evaluation is included before hashing when present)
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
 
   // Compute decision
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
@@ -128,7 +140,11 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
   const intentHash = sha256(canonicalStringify(intent));
 
   const steps = executeProofChain(intent);
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps);
+
+  // Optional OSS rule evaluation — callers may supply rule_pack + rule_pack_payload
+  const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
+
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;

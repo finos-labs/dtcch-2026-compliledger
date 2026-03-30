@@ -23,6 +23,15 @@ export interface ProofStepResult {
   evaluated_at: string;
 }
 
+export interface OssEvaluation {
+  /** Name of the OSS rule pack that was evaluated (e.g. "ISDA", "ISLA", "ICMA"). */
+  rule_pack: string;
+  /** Aggregated decision produced by the OSS rule set. */
+  decision: Decision;
+  /** Reason codes emitted by any rules that did not pass. */
+  reason_codes: string[];
+}
+
 export interface ProofBundle {
   bundle_version: string;
   asset_type: AssetType;
@@ -30,6 +39,8 @@ export interface ProofBundle {
   received_at: string;
   steps: ProofStepResult[];
   bundle_root_hash: string;
+  /** Optional OSS rule evaluation embedded in the sealed bundle. */
+  oss_evaluation?: OssEvaluation;
 }
 
 export interface DecisionRecord {
