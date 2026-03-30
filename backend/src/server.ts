@@ -13,6 +13,7 @@ import { PRESETS } from "./presets";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
 import { generateComplianceReasoning } from "./bedrock-reasoning";
+import { evaluate, type RulePack } from "./engine/ossRuleEvaluator";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -69,8 +70,14 @@ app.post("/v1/intents", (req, res) => {
   // Execute the Canonical Proof Chain
   const steps = executeProofChain(intent);
 
-  // Seal the proof bundle
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps);
+  // Optional OSS rule evaluation — runs when the caller supplies rule_pack + rule_pack_payload
+  const body = req.body as Record<string, unknown>;
+  const rulePack = body.rule_pack as RulePack | undefined;
+  const rulePackPayload = body.rule_pack_payload as Record<string, unknown> | undefined;
+  const ossEvaluation = rulePack && rulePackPayload ? evaluate(rulePack, rulePackPayload) : undefined;
+
+  // Seal the proof bundle (oss_evaluation is included before hashing when present)
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
 
   // Compute decision
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
@@ -128,7 +135,14 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
   const intentHash = sha256(canonicalStringify(intent));
 
   const steps = executeProofChain(intent);
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps);
+
+  // Optional OSS rule evaluation — callers may supply rule_pack + rule_pack_payload
+  const body = req.body as Record<string, unknown>;
+  const rulePack = body.rule_pack as RulePack | undefined;
+  const rulePackPayload = body.rule_pack_payload as Record<string, unknown> | undefined;
+  const ossEvaluation = rulePack && rulePackPayload ? evaluate(rulePack, rulePackPayload) : undefined;
+
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;
