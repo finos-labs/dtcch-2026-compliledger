@@ -1,5 +1,4 @@
-import { RuleRegistry, ruleRegistry } from "./ruleRegistry";
-import { evaluateRules } from "./decisionProvider";
+import { ruleRegistry } from "./ruleRegistry";
 import type { OssEvaluation } from "../types";
 
 export type RulePack = keyof typeof ruleRegistry;
@@ -15,20 +14,13 @@ export type RulePack = keyof typeof ruleRegistry;
 export function evaluate(rule_pack: RulePack, payload: Record<string, unknown>): OssEvaluation {
   const rules = ruleRegistry[rule_pack];
 
-  const registry = new RuleRegistry();
-  for (const rule of rules) {
-    registry.register(rule);
-  }
-
-  const result = evaluateRules(registry, payload);
-
-  const reason_codes = result.results
-    .filter((r) => !r.passed && r.reason_code)
-    .map((r) => r.reason_code as string);
+  const results = rules.map((rule) => ({ rule_id: rule.id, ...rule.evaluate(payload) }));
+  const passed = results.every((r) => r.passed);
+  const reason_codes = results.filter((r) => !r.passed && r.reason_code).map((r) => r.reason_code as string);
 
   return {
     rule_pack,
-    decision: result.passed ? "ALLOW" : "DENY",
+    decision: passed ? "ALLOW" : "DENY",
     reason_codes,
   };
 }
