@@ -10,6 +10,8 @@ import { computeDecision } from "./decision";
 import { issueAttestation, recomputeAttestationHash } from "./attestation";
 import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db";
 import { PRESETS } from "./presets";
+import { RuleRegistry, ruleRegistry } from "./engine/ruleRegistry";
+import { evaluateRules } from "./engine/decisionProvider";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
 import { generateComplianceReasoning } from "./bedrock-reasoning";
@@ -361,6 +363,53 @@ app.get("/v1/canton/commitments/:attestationHash", async (req, res) => {
   }
 });
 
+// POST /v1/demo/evaluate — Evaluate a payload against a rule pack
+app.post("/v1/demo/evaluate", (req, res) => {
+  const body = req.body as Record<string, unknown>;
+
+  if (!body || typeof body !== "object") {
+    res.status(400).json({ error: "Request body must be a JSON object" });
+    return;
+  }
+
+  const { rule_pack, payload } = body;
+
+  if (!rule_pack || typeof rule_pack !== "string") {
+    res.status(400).json({ error: "rule_pack is required and must be a string" });
+    return;
+  }
+
+  if (!(rule_pack in ruleRegistry)) {
+    res.status(400).json({
+      error: `Invalid rule_pack: ${rule_pack}`,
+      valid_rule_packs: Object.keys(ruleRegistry),
+    });
+    return;
+  }
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    res.status(400).json({ error: "payload is required and must be an object" });
+    return;
+  }
+
+  try {
+    const pack = rule_pack as keyof typeof ruleRegistry;
+    const registry = new RuleRegistry();
+    for (const rule of ruleRegistry[pack]) {
+      registry.register(rule);
+    }
+
+    const result = evaluateRules(registry, payload);
+    const decision = result.passed ? "ALLOW" : "DENY";
+    const reason_codes = result.results
+      .filter((r) => !r.passed && r.reason_code)
+      .map((r) => r.reason_code as string);
+
+    res.json({ rule_pack, decision, reason_codes });
+  } catch (err: unknown) {
+    console.error(`Evaluate error for rule_pack ${rule_pack}:`, err);
+    res.status(500).json({ error: "Evaluation failed" });
+  }
 // POST /v1/demo/evaluate — Evaluate a standalone OSS rule snippet (ISDA / ISLA / ICMA)
 app.post("/v1/demo/evaluate", (req, res) => {
   const body = req.body as Record<string, unknown>;
