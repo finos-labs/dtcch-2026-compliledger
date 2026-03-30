@@ -1,28 +1,21 @@
-import type { Rule } from "../rules/types";
-import type { RuleRegistry } from "./ruleRegistry";
+import { ruleRegistry } from "./ruleRegistry";
 
-export interface RuleResult {
-  rule_id: string;
-  passed: boolean;
-  reason_code?: string;
-}
+export function evaluate(rulePack: string, payload: any): { decision: "PASS" | "FAIL"; reason_codes: string[] } {
+  if (!(rulePack in ruleRegistry)) {
+    throw new Error(`Unsupported rule pack: ${rulePack}`);
+  }
+  const rules = ruleRegistry[rulePack as keyof typeof ruleRegistry];
 
-export interface DecisionResult {
-  passed: boolean;
-  results: RuleResult[];
-}
+  const reason_codes: string[] = [];
+  for (const rule of rules) {
+    const outcome = rule.evaluate(payload);
+    if (!outcome.passed && outcome.reason_code) {
+      reason_codes.push(outcome.reason_code);
+    }
+  }
 
-/**
- * Evaluates all registered rules against the provided input and returns
- * an aggregated decision result.
- */
-export function evaluateRules(registry: RuleRegistry, input: any): DecisionResult {
-  const rules: Rule[] = registry.getAll();
-  const results: RuleResult[] = rules.map((rule) => {
-    const outcome = rule.evaluate(input);
-    return { rule_id: rule.id, ...outcome };
-  });
-
-  const passed = results.every((r) => r.passed);
-  return { passed, results };
+  return {
+    decision: reason_codes.length === 0 ? "PASS" : "FAIL",
+    reason_codes,
+  };
 }
