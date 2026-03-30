@@ -1,19 +1,13 @@
 import type { Rule } from "../types";
 
-/**
- * ISDA margin rule: verifies that the initial margin ratio meets the
- * minimum threshold required under ISDA Credit Support Annex (CSA) terms.
- */
 export const isdaMarginRule: Rule = {
-  id: "ISDA_MARGIN_001",
-  evaluate(input: { margin_ratio?: number }) {
-    const MIN_MARGIN_RATIO = 1.0;
-    if (input.margin_ratio === undefined || input.margin_ratio === null) {
-      return { passed: false, reason_code: "MARGIN_RATIO_MISSING" };
+  id: "ISDA_MARGIN_SUFFICIENCY",
+  evaluate(input: { required_margin?: unknown; posted_collateral_value?: unknown }) {
+    const required = Number(input.required_margin);
+    const posted = Number(input.posted_collateral_value);
+    if (!isNaN(required) && !isNaN(posted) && posted >= required) {
+      return { passed: true };
     }
-    if (input.margin_ratio < MIN_MARGIN_RATIO) {
-      return { passed: false, reason_code: "MARGIN_RATIO_BELOW_MINIMUM" };
-    }
-    return { passed: true };
+    return { passed: false, reason_code: "INSUFFICIENT_MARGIN" };
   },
 };
