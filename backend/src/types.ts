@@ -32,6 +32,23 @@ export interface OssEvaluation {
   reason_codes: string[];
 }
 
+/** Input contract for evaluateSettlementDecision(). */
+export interface SettlementDecisionInput {
+  transaction_id: string;
+  phase: string;
+  rule_pack: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+}
+
+/** Output produced by evaluateSettlementDecision(), embedded in proof metadata. */
+export interface SettlementDecisionResult {
+  decision_result: Decision;
+  reason_codes: string[];
+  rule_version_used: string;
+  evaluated_at: string;
+}
+
 export interface ProofBundle {
   bundle_version: string;
   asset_type: AssetType;
@@ -41,6 +58,8 @@ export interface ProofBundle {
   bundle_root_hash: string;
   /** Optional OSS rule evaluation embedded in the sealed bundle. */
   oss_evaluation?: OssEvaluation;
+  /** Optional settlement decision evaluation embedded in the sealed bundle. */
+  settlement_decision?: SettlementDecisionResult;
 }
 
 export interface DecisionRecord {

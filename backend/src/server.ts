@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
-import type { SettlementIntent, VerifyRequest, VerifyResponse, AnchorRecord } from "./types";
+import type { SettlementIntent, VerifyRequest, VerifyResponse, AnchorRecord, SettlementDecisionResult } from "./types";
 import { canonicalStringify, sha256, verifySignature, getPublicKeyB64 } from "./crypto";
 import { executeProofChain } from "./proof-chain";
 import { sealBundle } from "./bundle";
@@ -11,7 +11,7 @@ import { issueAttestation, recomputeAttestationHash } from "./attestation";
 import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db";
 import { PRESETS } from "./presets";
 import { RuleRegistry, ruleRegistry } from "./engine/ruleRegistry";
-import { evaluateRules } from "./engine/decisionProvider";
+import { evaluateRules, evaluateSettlementDecision } from "./engine/decisionProvider";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
 import { generateComplianceReasoning } from "./bedrock-reasoning";
@@ -29,6 +29,26 @@ function resolveOssEvaluation(body: Record<string, unknown>): OssEvaluation | un
   const rulePack = body.rule_pack as RulePack | undefined;
   const rulePackPayload = body.rule_pack_payload as Record<string, unknown> | undefined;
   return rulePack && rulePackPayload ? evaluate(rulePack, rulePackPayload) : undefined;
+}
+
+/**
+ * Call evaluateSettlementDecision() when the request carries a rule_pack.
+ * Wires in: transaction_id, phase, rule_pack, event_type, payload.
+ */
+function resolveSettlementDecision(
+  body: Record<string, unknown>,
+  transactionId: string
+): SettlementDecisionResult | undefined {
+  const rulePack = body.rule_pack as RulePack | undefined;
+  if (!rulePack || !(rulePack in ruleRegistry)) return undefined;
+  const payload = (body.rule_pack_payload ?? {}) as Record<string, unknown>;
+  return evaluateSettlementDecision({
+    transaction_id: transactionId,
+    phase: (body.phase as string) ?? "settlement",
+    rule_pack: rulePack,
+    event_type: (body.event_type as string) ?? "intent_submitted",
+    payload,
+  });
 }
 
 function validateIntent(body: unknown): { valid: boolean; error?: string; intent?: SettlementIntent } {
@@ -83,8 +103,11 @@ app.post("/v1/intents", (req, res) => {
   // Optional OSS rule evaluation — runs when the caller supplies rule_pack + rule_pack_payload
   const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
 
-  // Seal the proof bundle (oss_evaluation is included before hashing when present)
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
+  // Evaluate settlement decision before proof generation (embedded in bundle metadata)
+  const settlementDecision = resolveSettlementDecision(req.body as Record<string, unknown>, intentId);
+
+  // Seal the proof bundle (oss_evaluation and settlement_decision are included before hashing when present)
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation, settlementDecision);
 
   // Compute decision
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
@@ -146,7 +169,10 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
   // Optional OSS rule evaluation — callers may supply rule_pack + rule_pack_payload
   const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
 
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation);
+  // Evaluate settlement decision before proof generation (embedded in bundle metadata)
+  const settlementDecision = resolveSettlementDecision(req.body as Record<string, unknown>, intentId);
+
+  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation, settlementDecision);
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;
@@ -410,24 +436,6 @@ app.post("/v1/demo/evaluate", (req, res) => {
     console.error(`Evaluate error for rule_pack ${rule_pack}:`, err);
     res.status(500).json({ error: "Evaluation failed" });
   }
-// POST /v1/demo/evaluate — Evaluate a standalone OSS rule snippet (ISDA / ISLA / ICMA)
-app.post("/v1/demo/evaluate", (req, res) => {
-  const body = req.body as Record<string, unknown>;
-  const rulePack = body.rule_pack as RulePack | undefined;
-  const payload = body.payload as Record<string, unknown> | undefined;
-
-  if (!rulePack || !payload) {
-    res.status(400).json({ error: "rule_pack and payload are required" });
-    return;
-  }
-
-  if (!["ISDA", "ISLA", "ICMA"].includes(rulePack)) {
-    res.status(400).json({ error: "rule_pack must be one of: ISDA, ISLA, ICMA" });
-    return;
-  }
-
-  const result = evaluate(rulePack, payload);
-  res.json(result);
 });
 
 // GET /health — Health check
