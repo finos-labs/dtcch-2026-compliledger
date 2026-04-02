@@ -28,10 +28,7 @@ export class RuleRegistry {
 export const defaultRegistry = new RuleRegistry();
 
 export const ruleRegistry = {
-  ISDA: [isdaMarginRule],
-  ISLA: [islaEligibilityRule, islaCollateralRule],
-  ICMA: [icmaRepoRule],
   ISDA: [isdaCounterpartyRule, isdaMarginRule],
-  ISLA: [islaCollateralRule],
+  ISLA: [islaEligibilityRule, islaCollateralRule],
   ICMA: [icmaRepoRule, icmaMaturityRule],
 };
