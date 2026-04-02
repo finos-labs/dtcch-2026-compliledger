@@ -66,10 +66,10 @@ const RULE_PACKS: RulePackConfig[] = [
   },
 ];
 
-function toDisplayDecision(result: RulePackEvalResult, totalControls: number): DisplayDecision {
-  if (result.decision === "ALLOW") return "PASS";
-  if (result.reason_codes.length < totalControls) return "CONDITIONAL";
-  return "FAIL";
+function toDisplayDecision(result: RulePackEvalResult): DisplayDecision {
+  if (result.reason_codes.length > 0) return "FAIL";
+  if (result.decision === "DENY") return "CONDITIONAL";
+  return "PASS";
 }
 
 interface Props {
@@ -126,7 +126,7 @@ export function OssRulesPanel({ dark }: Props) {
           const result = results[pack.id];
           const isLoading = loading[pack.id];
           const error = errors[pack.id];
-          const displayDecision = result ? toDisplayDecision(result, pack.controls.length) : null;
+          const displayDecision = result ? toDisplayDecision(result) : null;
 
           const decisionColor = displayDecision === "PASS"
             ? dark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
