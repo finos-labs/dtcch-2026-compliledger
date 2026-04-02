@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { SGHeader } from "@/components/sg-header";
 import { SGFooter } from "@/components/sg-footer";
+import { OssRulesPanel } from "@/components/app/oss-rules-panel";
 import {
   runPreset,
   anchorAttestation,
@@ -489,6 +490,11 @@ export default function AppPage(): ReactNode {
             </div>
           </div>
         )}
+
+        {/* OSS Rule Packs */}
+        <div className="mt-4">
+          <OssRulesPanel dark={dark} />
+        </div>
 
         {/* Bottom Banner */}
         <div className={`mt-4 flex items-center justify-center border-y ${border} py-2`}>

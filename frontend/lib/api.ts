@@ -199,3 +199,27 @@ export async function fetchReasoning(intentId: string): Promise<ComplianceReason
   }
   return res.json();
 }
+
+export type RulePack = "ISDA" | "ISLA" | "ICMA";
+
+export interface RulePackEvalResult {
+  rule_pack: RulePack;
+  decision: "ALLOW" | "DENY";
+  reason_codes: string[];
+}
+
+export async function evaluateRulePack(
+  rulePack: RulePack,
+  payload: Record<string, unknown>
+): Promise<RulePackEvalResult> {
+  const res = await fetch(`${API_BASE}/v1/demo/evaluate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rule_pack: rulePack, payload }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Rule evaluation failed: ${res.statusText}`);
+  }
+  return res.json();
+}
