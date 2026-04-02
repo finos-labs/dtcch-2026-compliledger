@@ -224,7 +224,7 @@ export default function AppPage(): ReactNode {
                         ? dark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
                         : dark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-600"
                     }`}>
-                      {s.short}
+                      {s.short === "ALLOW" ? "PASS" : "FAIL"}
                     </span>
                   </div>
                   <div className="mb-2 flex items-baseline gap-3">
@@ -262,7 +262,7 @@ export default function AppPage(): ReactNode {
                     <span className={`inline-block h-1.5 w-1.5 rounded-full ${
                       decision?.decision === "ALLOW" ? "bg-emerald-500" : "bg-amber-500"
                     }`} />
-                    {decision?.decision === "ALLOW" ? "Enforcement Passed" : "Pending Enforcement"}
+                    {decision?.decision === "ALLOW" ? "PASS" : "FAIL"}
                   </span>
                 </Row>
                 <Row label="Finality" value={decision?.decision === "ALLOW" && anchor ? "Authorized" : "Not Authorized"} dark={dark} />
@@ -331,7 +331,7 @@ export default function AppPage(): ReactNode {
                       ? "bg-emerald-500/20 text-emerald-400"
                       : "bg-red-500/20 text-red-400"
                   }`}>
-                    {decision?.decision}
+                    {decision?.decision === "ALLOW" ? "PASS" : decision?.decision === "DENY" ? "FAIL" : decision?.decision}
                   </span>
                 </Row>
                 {attestation && (
