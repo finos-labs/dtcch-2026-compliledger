@@ -7,12 +7,12 @@ export const islaCollateralRule: Rule = {
     const loanValue = Number(input.loan_value);
     const haircut = Number(input.haircut);
     if (isNaN(collateralValue) || isNaN(loanValue) || isNaN(haircut)) {
-      return { passed: false, reason_code: "INSUFFICIENT_COLLATERAL" };
+      return { status: "FAIL" as const, reason_code: "INSUFFICIENT_COLLATERAL" };
     }
     const requiredCoverage = loanValue * (1 + haircut);
     if (collateralValue >= requiredCoverage) {
-      return { passed: true };
+      return { status: "PASS" as const };
     }
-    return { passed: false, reason_code: "INSUFFICIENT_COLLATERAL" };
+    return { status: "FAIL" as const, reason_code: "INSUFFICIENT_COLLATERAL" };
   },
 };

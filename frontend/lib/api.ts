@@ -204,7 +204,7 @@ export type RulePack = "ISDA" | "ISLA" | "ICMA";
 
 export interface RulePackEvalResult {
   rule_pack: RulePack;
-  decision: "ALLOW" | "DENY";
+  decision: "PASS" | "FAIL" | "CONDITIONAL";
   reason_codes: string[];
 }
 

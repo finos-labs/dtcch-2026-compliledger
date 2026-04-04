@@ -8,8 +8,8 @@ export const icmaRepoRule: Rule = {
     const haircut = Number(input.haircut);
     const requiredCoverage = purchasePrice * (1 + haircut);
     if (collateralValue >= requiredCoverage) {
-      return { passed: true };
+      return { status: "PASS" as const };
     }
-    return { passed: false, reason_code: "COLLATERAL_DEFICIT" };
+    return { status: "FAIL" as const, reason_code: "COLLATERAL_DEFICIT" };
   },
 };

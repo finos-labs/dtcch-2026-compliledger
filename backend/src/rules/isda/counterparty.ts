@@ -4,8 +4,8 @@ export const isdaCounterpartyRule: Rule = {
   id: "ISDA_COUNTERPARTY_VALID",
   evaluate(input: { counterparty_status?: unknown }) {
     if (input.counterparty_status === "ACTIVE") {
-      return { passed: true };
+      return { status: "PASS" as const };
     }
-    return { passed: false, reason_code: "INVALID_COUNTERPARTY" };
+    return { status: "FAIL" as const, reason_code: "INVALID_COUNTERPARTY" };
   },
 };

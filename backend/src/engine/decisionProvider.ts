@@ -1,6 +1,6 @@
 import { ruleRegistry, RuleRegistry } from "./ruleRegistry";
 import { evaluate as ossEvaluate, type RulePack } from "./ossRuleEvaluator";
-import type { SettlementDecisionInput, SettlementDecisionResult } from "../types";
+import type { SettlementDecisionInput, SettlementDecisionResult, RuleDecision } from "../types";
 
 /** Maps each rule pack to a human-readable version string for audit trails. */
 const RULE_VERSIONS: Record<string, string> = {
@@ -9,24 +9,24 @@ const RULE_VERSIONS: Record<string, string> = {
   ICMA: "icma-gmra-2011-v1",
 };
 
-export function evaluate(rulePack: string, payload: any): { decision: "PASS" | "FAIL"; reason_codes: string[] } {
+export function evaluate(rulePack: string, payload: any): { decision: RuleDecision; reason_codes: string[] } {
   if (!(rulePack in ruleRegistry)) {
     throw new Error(`Unsupported rule pack: ${rulePack}`);
   }
   const rules = ruleRegistry[rulePack as keyof typeof ruleRegistry];
+  const results = rules.map((rule) => rule.evaluate(payload));
+  const reason_codes = results.filter((r) => r.status !== "PASS" && r.reason_code).map((r) => r.reason_code as string);
 
-  const reason_codes: string[] = [];
-  for (const rule of rules) {
-    const outcome = rule.evaluate(payload);
-    if (!outcome.passed && outcome.reason_code) {
-      reason_codes.push(outcome.reason_code);
-    }
+  let decision: RuleDecision;
+  if (results.some((r) => r.status === "FAIL")) {
+    decision = "FAIL";
+  } else if (results.some((r) => r.status === "CONDITIONAL")) {
+    decision = "CONDITIONAL";
+  } else {
+    decision = "PASS";
   }
 
-  return {
-    decision: reason_codes.length === 0 ? "PASS" : "FAIL",
-    reason_codes,
-  };
+  return { decision, reason_codes };
 }
 
 /**
@@ -49,8 +49,8 @@ export function evaluateSettlementDecision(
 export function evaluateRules(
   registry: RuleRegistry,
   payload: unknown
-): { passed: boolean; results: Array<{ passed: boolean; reason_code?: string }> } {
+): { passed: boolean; results: Array<{ status: string; reason_code?: string }> } {
   const rules = registry.getAll();
   const results = rules.map((rule) => rule.evaluate(payload));
-  return { passed: results.every((r) => r.passed), results };
+  return { passed: results.every((r) => r.status === "PASS"), results };
 }

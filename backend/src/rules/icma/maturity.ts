@@ -6,8 +6,8 @@ export const icmaMaturityRule: Rule = {
     const currentDate = Number(input.current_date);
     const endDate = Number(input.end_date);
     if (currentDate <= endDate) {
-      return { passed: true };
+      return { status: "PASS" as const };
     }
-    return { passed: false, reason_code: "REPO_EXPIRED" };
+    return { status: "FAIL" as const, reason_code: "REPO_EXPIRED" };
   },
 };

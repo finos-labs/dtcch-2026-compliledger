@@ -6,8 +6,8 @@ export const islaEligibilityRule: Rule = {
     const collateralType = input.collateral_type;
     const allowedTypes = input.allowed_types;
     if (!Array.isArray(allowedTypes) || !allowedTypes.includes(collateralType)) {
-      return { passed: false, reason_code: "INELIGIBLE_COLLATERAL" };
+      return { status: "FAIL" as const, reason_code: "INELIGIBLE_COLLATERAL" };
     }
-    return { passed: true };
+    return { status: "PASS" as const };
   },
 };

@@ -6,8 +6,8 @@ export const isdaMarginRule: Rule = {
     const required = Number(input.required_margin);
     const posted = Number(input.posted_collateral_value);
     if (!isNaN(required) && !isNaN(posted) && posted >= required) {
-      return { passed: true };
+      return { status: "PASS" as const };
     }
-    return { passed: false, reason_code: "INSUFFICIENT_MARGIN" };
+    return { status: "FAIL" as const, reason_code: "INSUFFICIENT_MARGIN" };
   },
 };

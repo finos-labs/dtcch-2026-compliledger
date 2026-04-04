@@ -426,10 +426,18 @@ app.post("/v1/demo/evaluate", (req, res) => {
     }
 
     const result = evaluateRules(registry, payload);
-    const decision = result.passed ? "ALLOW" : "DENY";
     const reason_codes = result.results
-      .filter((r) => !r.passed && r.reason_code)
+      .filter((r) => r.status !== "PASS" && r.reason_code)
       .map((r) => r.reason_code as string);
+
+    let decision: "PASS" | "FAIL" | "CONDITIONAL";
+    if (result.results.some((r) => r.status === "FAIL")) {
+      decision = "FAIL";
+    } else if (result.results.some((r) => r.status === "CONDITIONAL")) {
+      decision = "CONDITIONAL";
+    } else {
+      decision = "PASS";
+    }
 
     res.json({ rule_pack, decision, reason_codes });
   } catch (err: unknown) {

@@ -2,6 +2,7 @@ export type AssetType = "tokenized_treasury" | "stablecoin";
 export type IssuerStatus = "active" | "suspended";
 export type Classification = "tokenized_security" | "stablecoin" | "unknown";
 export type Decision = "ALLOW" | "DENY";
+export type RuleDecision = "PASS" | "FAIL" | "CONDITIONAL";
 
 export interface SettlementIntent {
   asset_type: AssetType;
@@ -27,7 +28,7 @@ export interface OssEvaluation {
   /** Name of the OSS rule pack that was evaluated (e.g. "ISDA", "ISLA", "ICMA"). */
   rule_pack: string;
   /** Aggregated decision produced by the OSS rule set. */
-  decision: Decision;
+  decision: RuleDecision;
   /** Reason codes emitted by any rules that did not pass. */
   reason_codes: string[];
 }
@@ -43,7 +44,7 @@ export interface SettlementDecisionInput {
 
 /** Output produced by evaluateSettlementDecision(), embedded in proof metadata. */
 export interface SettlementDecisionResult {
-  decision_result: Decision;
+  decision_result: RuleDecision;
   reason_codes: string[];
   rule_version_used: string;
   evaluated_at: string;

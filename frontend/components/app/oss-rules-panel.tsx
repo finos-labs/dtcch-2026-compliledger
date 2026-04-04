@@ -4,7 +4,7 @@ import { useState } from "react";
 import { evaluateRulePack, type RulePack, type RulePackEvalResult } from "@/lib/api";
 
 type Phase = "CLEARING" | "SETTLEMENT";
-type DisplayDecision = "PASS" | "FAIL" | "CONDITIONAL";
+type DisplayDecision = "PASS" | "FAIL" | "CONDITIONAL"; // mirrors backend RuleDecision
 
 interface RulePackConfig {
   id: RulePack;
@@ -67,9 +67,7 @@ const RULE_PACKS: RulePackConfig[] = [
 ];
 
 function toDisplayDecision(result: RulePackEvalResult): DisplayDecision {
-  if (result.reason_codes.length > 0) return "FAIL";
-  if (result.decision === "DENY") return "CONDITIONAL";
-  return "PASS";
+  return result.decision;
 }
 
 interface Props {
