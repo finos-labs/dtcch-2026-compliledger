@@ -21,19 +21,19 @@ SettlementGuard is **governance infrastructure** for tokenized settlement system
 
 1. **Canonical Proof Chain** — deterministic compliance evaluation in a fixed, reproducible order
 2. **Cryptographic Attestation** — Ed25519-signed proof bundles with SHA-256 Merkle roots
-3. **On-Chain Anchoring** — immutable commitment records on Algorand
+3. **On-Chain Anchoring** — immutable commitment records on Canton with DynamoDB-backed commitment lookup and SQLite fallback
 4. **AI Compliance Reasoning** — natural-language analysis via Amazon Bedrock Nova Micro
 5. **State Governance** — (in development) cross-chain state verification and policy enforcement
 
 ### Current Implementation
 
-The current MVP runs on **Algorand testnet** with support for:
+The current open-source MVP runs on a **Canton-aligned commitment flow** with support for:
 - Tokenized treasury settlement (T-bills, government securities)
 - Stablecoin redemption and transfer
 - Reserve ratio validation
 - Custody condition verification
 
-> **Origin**: This repository originated from the [DTCC/FINOS Innovate.DTCC Hackathon 2026](https://github.com/finos-labs) prototype. The initial implementation used Canton Network. The production architecture has migrated to Algorand for the settlement rail.
+> **Origin**: This repository originated from the [DTCC/FINOS Innovate.DTCC Hackathon 2026](https://github.com/finos-labs) prototype. The open-source version keeps the Canton-style anchoring and commitment registry flow.
 
 ---
 
@@ -41,8 +41,8 @@ The current MVP runs on **Algorand testnet** with support for:
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Settlement Rail** | Algorand | On-chain commitment anchoring via application calls |
-| **Backend** | Node.js / Express / TypeScript | Proof chain evaluation, attestation issuance, Algorand adapter |
+| **Settlement Rail** | Canton-style commitment registry | Commitment anchoring and lookup flow |
+| **Backend** | Node.js / Express / TypeScript | Proof chain evaluation, attestation issuance, Canton + DynamoDB adapter |
 | **AI Reasoning** | AWS Bedrock — Amazon Nova Micro | Natural-language compliance analysis of each proof step |
 | **Cryptography** | SHA-256 + Ed25519 | Bundle hashing, attestation signing, transaction signing |
 | **Frontend** | Next.js 15 / React / Tailwind CSS | Enforcement console with real-time network status |
@@ -61,27 +61,37 @@ Proof Bundle Sealed (SHA-256 Merkle root)
        ↓
 Attestation Signed (Ed25519)
        ↓
-Algorand Commitment (Application Call)
+Canton Commitment Anchoring
        ↓
 AI Compliance Reasoning (Bedrock Nova Micro)
 ```
 
-### Algorand Integration
+### Canton / Commitment Registry Integration
 
-SettlementGuard anchors enforcement decisions to Algorand testnet:
+SettlementGuard anchors enforcement decisions through a Canton-style commitment flow:
 
-- **Application ID** — smart contract managing commitment records
-- **Transaction Type** — application call with attestation hash in note field
-- **Confirmed Round** — block height at which commitment was finalized
-- **Indexer** — query historical commitments by attestation hash
+- **Anchor Route** — `POST /v1/attestations/:id/anchor`
+- **Commitment Lookup** — `GET /v1/canton/commitments/:attestationHash`
+- **Status Route** — `GET /v1/canton/status`
+- **Storage** — DynamoDB-backed commitment registry with SQLite fallback for local/demo execution
 
 ### API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/algorand/status` | GET | Network connectivity, node health, current round |
-| `/v1/algorand/commitments/:hash` | GET | Lookup commitment by attestation hash |
-| `/v1/attestations/:id/anchor` | POST | Anchor attestation to Algorand, returns transaction ID |
+| `/health` | GET | Backend health check |
+| `/v1/intents` | POST | Submit a settlement intent for proof evaluation and enforcement |
+| `/v1/intents` | GET | List persisted intent records |
+| `/v1/intents/:id` | GET | Fetch a specific intent record |
+| `/v1/intents/preset/:presetId` | POST | Run a predefined settlement scenario |
+| `/v1/verify` | POST | Verify attestation signature and optional on-chain presence |
+| `/v1/attestations/:id/anchor` | POST | Anchor an ALLOW attestation into the Canton-style commitment flow |
+| `/v1/reasoning/:id` | POST | Generate Bedrock-backed compliance reasoning for an intent |
+| `/v1/presets` | GET | List available demo presets |
+| `/v1/public-key` | GET | Fetch the active public verification key and key metadata |
+| `/v1/canton/status` | GET | Canton network/configuration status |
+| `/v1/canton/commitments/:attestationHash` | GET | Lookup a commitment by attestation hash |
+| `/v1/demo/evaluate` | POST | Evaluate an OSS rule pack independently of the proof chain |
 
 ---
 
@@ -115,6 +125,25 @@ AI Compliance Reasoning (Bedrock Nova Micro)
 **ALLOW** — all four proof steps pass → attestation issued → Canton anchor created → AI reasoning generated
 
 **DENY** — any proof step fails → no attestation → no on-chain commitment → settlement blocked
+
+## Decision Model
+
+SettlementGuard intentionally separates the evaluation layer from the enforcement layer:
+
+- **Evaluation Decision** — `PASS | FAIL | CONDITIONAL`
+- **Enforcement Decision** — `ALLOW | DENY`
+
+These are used for different responsibilities:
+
+- **PASS / FAIL / CONDITIONAL** represent rule-level evaluation outcomes
+- **ALLOW / DENY** represent whether the transaction is permitted to proceed
+
+In API responses:
+
+- `decision_type: "enforcement"` accompanies proof-chain enforcement responses such as `POST /v1/intents`
+- `decision_type: "evaluation"` accompanies OSS rule evaluation responses such as `POST /v1/demo/evaluate`
+
+This separation is intentional for the open-source version.
 
 ---
 
@@ -234,7 +263,7 @@ curl -X POST http://localhost:3001/v1/demo/evaluate \
 }
 ```
 
-A passing evaluation returns `"decision": "ALLOW"` with an empty `reason_codes` array. A failing evaluation returns `"decision": "DENY"` with one or more reason codes identifying which rule was not satisfied.
+A passing evaluation returns `"decision": "PASS"` with an empty `reason_codes` array. A failing evaluation returns `"decision": "FAIL"` or `"CONDITIONAL"` with one or more reason codes identifying which rule was not satisfied.
 
 ---
 
@@ -291,12 +320,19 @@ npm start          # Runs on http://localhost:3001
 
 Required environment variables (see `.env.example`):
 ```env
+SG_SIGNING_SEED_B64=your_base64_32_byte_seed
+SG_KEY_ID=sg-demo-key-01
+SG_KEY_VERSION=v1
+API_BEARER_TOKEN=shared_demo_token
+JSON_BODY_LIMIT=32kb
+POST_RATE_LIMIT_MAX=60
 AWS_REGION=us-east-2
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
 BEDROCK_MODEL_ID=us.amazon.nova-micro-v1:0
-ALGORAND_ALGOD_SERVER=https://testnet-api.algonode.cloud
-ALGORAND_INDEXER_SERVER=https://testnet-idx.algonode.cloud
+CANTON_DOMAIN=global-synchronizer.canton.network
+CANTON_PARTICIPANT=sg-participant-01
+DYNAMO_TABLE=sg-commitment-registry
 ```
 
 ### Frontend
@@ -318,6 +354,7 @@ BACKEND_API_URL=http://localhost:3001 npm run dev
 - **Privacy-preserving** — only hashes anchored on-chain, no sensitive data
 - **Independently verifiable** — any party can verify the attestation hash + on-chain commitment
 - **AI-augmented** — natural-language reasoning supplements (not replaces) deterministic proofs
+- **Layered decisioning** — evaluation outcomes (`PASS/FAIL/CONDITIONAL`) remain distinct from enforcement outcomes (`ALLOW/DENY`)
 
 ---
 

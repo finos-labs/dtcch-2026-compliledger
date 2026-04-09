@@ -1,9 +1,8 @@
 import type { Attestation, SignedAttestation, AssetType } from "./types";
-import { canonicalStringify, sha256, signData } from "./crypto";
+import { canonicalStringify, sha256, signData, getSigningKeyId, getSigningKeyVersion } from "./crypto";
 
 const ATTESTATION_VERSION = "sg-attest-v1";
 const SIGNER_NAME = "SettlementGuard";
-const KEY_ID = "sg-demo-key-01";
 
 export function issueAttestation(
   intentId: string,
@@ -23,7 +22,8 @@ export function issueAttestation(
     issued_at: issuedAt,
     signer: {
       name: SIGNER_NAME,
-      key_id: KEY_ID,
+      key_id: getSigningKeyId(),
+      key_version: getSigningKeyVersion(),
     },
   };
 

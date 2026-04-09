@@ -1,9 +1,10 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { v4 as uuidv4 } from "uuid";
 import type { SettlementIntent, VerifyRequest, VerifyResponse, AnchorRecord, SettlementDecisionResult } from "./types";
-import { canonicalStringify, sha256, verifySignature, getPublicKeyB64 } from "./crypto";
+import { canonicalStringify, sha256, verifySignature, getPublicKeyB64, getSigningKeyId, getSigningKeyVersion } from "./crypto";
 import { executeProofChain } from "./proof-chain";
 import { sealBundle } from "./bundle";
 import { computeDecision } from "./decision";
@@ -20,9 +21,50 @@ import type { OssEvaluation } from "./types";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || "32kb";
+const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
+
+const postRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.POST_RATE_LIMIT_MAX || 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Rate limit exceeded" },
+});
+
+function requireBearerToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!API_BEARER_TOKEN) {
+    next();
+    return;
+  }
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Missing bearer token" });
+    return;
+  }
+  const token = header.slice("Bearer ".length);
+  if (token !== API_BEARER_TOKEN) {
+    res.status(401).json({ error: "Invalid bearer token" });
+    return;
+  }
+  next();
+}
+
+app.use("/v1/intents", postRateLimiter);
+app.use("/v1/verify", postRateLimiter);
+app.use("/v1/attestations", postRateLimiter);
+app.use("/v1/reasoning", postRateLimiter);
+app.use("/v1/demo/evaluate", postRateLimiter);
+
+app.post("/v1/intents", requireBearerToken);
+app.post("/v1/intents/preset/:presetId", requireBearerToken);
+app.post("/v1/verify", requireBearerToken);
+app.post("/v1/attestations/:id/anchor", requireBearerToken);
+app.post("/v1/reasoning/:id", requireBearerToken);
+app.post("/v1/demo/evaluate", requireBearerToken);
 
 /** Extract and run an optional OSS rule evaluation from a request body. */
 function resolveOssEvaluation(body: Record<string, unknown>): OssEvaluation | undefined {
@@ -79,6 +121,10 @@ function validateIntent(body: unknown): { valid: boolean; error?: string; intent
 
   if (typeof b.reserve_ratio !== "number") {
     return { valid: false, error: "reserve_ratio must be a number" };
+  }
+
+  if (typeof b.custody_valid !== "boolean") {
+    return { valid: false, error: "custody_valid must be a boolean" };
   }
 
   return { valid: true, intent: b as unknown as SettlementIntent };
@@ -141,6 +187,7 @@ app.post("/v1/intents", (req, res) => {
     intent_hash: intentHash,
     received_at: receivedAt,
     bundle,
+    decision_type: "enforcement",
     decision: decisionRecord,
     attestation: signedAttestation,
   });
@@ -204,6 +251,7 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
     intent_hash: intentHash,
     received_at: receivedAt,
     bundle,
+    decision_type: "enforcement",
     decision: decisionRecord,
     attestation: signedAttestation,
   });
@@ -366,7 +414,11 @@ app.get("/v1/presets", (_req, res) => {
 
 // GET /v1/public-key — Get the public key for signature verification
 app.get("/v1/public-key", (_req, res) => {
-  res.json({ public_key: getPublicKeyB64(), key_id: "sg-demo-key-01" });
+  res.json({
+    public_key: getPublicKeyB64(),
+    key_id: getSigningKeyId(),
+    key_version: getSigningKeyVersion(),
+  });
 });
 
 // GET /v1/canton/status — Canton Network connectivity and configuration
@@ -439,7 +491,12 @@ app.post("/v1/demo/evaluate", (req, res) => {
       decision = "PASS";
     }
 
-    res.json({ rule_pack, decision, reason_codes });
+    res.json({
+      rule_pack,
+      decision_type: "evaluation",
+      decision,
+      reason_codes,
+    });
   } catch (err: unknown) {
     console.error(`Evaluate error for rule_pack ${rule_pack}:`, err);
     res.status(500).json({ error: "Evaluation failed" });

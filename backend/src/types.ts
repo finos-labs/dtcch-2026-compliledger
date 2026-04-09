@@ -67,6 +67,7 @@ export interface DecisionRecord {
   decision: Decision;
   decision_hash: string;
   bundle_root_hash: string;
+  decision_type?: "enforcement";
 }
 
 export interface Attestation {
@@ -80,6 +81,7 @@ export interface Attestation {
   signer: {
     name: string;
     key_id: string;
+    key_version: string;
   };
 }
 

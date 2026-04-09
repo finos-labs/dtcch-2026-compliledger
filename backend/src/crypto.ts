@@ -4,11 +4,19 @@ import naclUtil from "tweetnacl-util";
 
 let keyPair: nacl.SignKeyPair | null = null;
 
+const DEFAULT_KEY_ID = "sg-demo-key-01";
+const DEFAULT_KEY_VERSION = "v1";
+
 function getKeyPair(): nacl.SignKeyPair {
   if (!keyPair) {
-    const seed = createHash("sha256")
-      .update("sg-demo-key-01-seed-deterministic")
-      .digest();
+    const seedB64 = process.env.SG_SIGNING_SEED_B64;
+    if (!seedB64) {
+      throw new Error("Missing SG_SIGNING_SEED_B64 environment variable");
+    }
+    const seed = Buffer.from(seedB64, "base64");
+    if (seed.length !== 32) {
+      throw new Error("SG_SIGNING_SEED_B64 must decode to exactly 32 bytes");
+    }
     keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed));
   }
   return keyPair;
@@ -61,4 +69,12 @@ export function verifySignature(dataHash: string, signatureB64: string): boolean
 export function getPublicKeyB64(): string {
   const kp = getKeyPair();
   return naclUtil.encodeBase64(kp.publicKey);
+}
+
+export function getSigningKeyId(): string {
+  return process.env.SG_KEY_ID || DEFAULT_KEY_ID;
+}
+
+export function getSigningKeyVersion(): string {
+  return process.env.SG_KEY_VERSION || DEFAULT_KEY_VERSION;
 }
