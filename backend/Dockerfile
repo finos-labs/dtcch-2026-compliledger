@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY backend/package*.json ./
 
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY backend/ .
 
