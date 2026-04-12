@@ -1,0 +1,9 @@
+**/node_modules
+backend/dist
+frontend/.next
+frontend/out
+**/*.log
+.git
+.env
+.env.*
+!.env.example
