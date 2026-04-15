@@ -1,0 +1,62 @@
+module SettlementGuard.CommitmentRegistry where
+
+-- | On-ledger record of a SettlementGuard compliance commitment.
+-- Created by the submitter, co-signed by the custodian via AnchorCommitment.
+-- The existence of this contract on Canton IS the immutable attestation.
+template SettlementCommitment
+  with
+    submitter      : Party
+    custodian      : Party
+    intentId       : Text
+    attestationHash: Text
+    bundleRootHash : Text
+    assetType      : Text
+    schemaVersion  : Text
+    createdAt      : Time
+  where
+    signatory submitter
+    observer  custodian
+
+    ensure attestationHash /= "" && bundleRootHash /= "" && intentId /= ""
+
+    -- | Custodian countersigns, making this a dual-party commitment.
+    choice AnchorCommitment : ContractId AnchoredCommitment
+      controller custodian
+      do
+        now <- getTime
+        create AnchoredCommitment with
+          submitter
+          custodian
+          intentId
+          attestationHash
+          bundleRootHash
+          assetType
+          schemaVersion
+          createdAt
+          anchoredAt = now
+
+    -- | Archive without anchoring (e.g. rejected intent cleanup).
+    choice Revoke : ()
+      controller submitter
+      do pure ()
+
+
+-- | Final immutable dual-party commitment record.
+-- Both submitter and custodian are signatories — cannot be altered by either alone.
+template AnchoredCommitment
+  with
+    submitter      : Party
+    custodian      : Party
+    intentId       : Text
+    attestationHash: Text
+    bundleRootHash : Text
+    assetType      : Text
+    schemaVersion  : Text
+    createdAt      : Time
+    anchoredAt     : Time
+  where
+    signatory submitter, custodian
+
+    nonconsuming choice VerifyHash : Text
+      controller submitter
+      do pure attestationHash

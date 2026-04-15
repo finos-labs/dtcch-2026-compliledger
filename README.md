@@ -7,7 +7,7 @@
 ### Governance infrastructure for tokenized settlement systems
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge)](LICENSE)
-[![Algorand](https://img.shields.io/badge/Built%20on-Algorand-000000?style=for-the-badge&logo=algorand)](https://algorand.com)
+
 
 </div>
 
@@ -41,7 +41,7 @@ The current open-source MVP runs on a **Canton-aligned commitment flow** with su
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Settlement Rail** | Canton-style commitment registry | Commitment anchoring and lookup flow |
+| **Settlement Rail** | Canton commitment registry (Daml) | Commitment anchoring and lookup flow |
 | **Backend** | Node.js / Express / TypeScript | Proof chain evaluation, attestation issuance, Canton + DynamoDB adapter |
 | **AI Reasoning** | AWS Bedrock — Amazon Nova Micro | Natural-language compliance analysis of each proof step |
 | **Cryptography** | SHA-256 + Ed25519 | Bundle hashing, attestation signing, transaction signing |
@@ -164,8 +164,50 @@ Each step produces a SHA-256 hash of its normalized inputs. The chain never chan
 
 - **Bundle Root Hash** — SHA-256 over concatenated proof step hashes
 - **Attestation Signature** — Ed25519 over `{bundle_root_hash}:{intent_id}:{issued_at}`
-- **Transaction ID** — Algorand transaction hash containing attestation commitment
+- **On-ledger Contract** — Canton `contractId` and `transaction_id` for commitment records (e.g., `AnchoredCommitment`)
 - **Privacy** — only hashes committed on-chain; raw settlement data never leaves the originating environment
+
+---
+
+## Canton Integration and Local Testing
+
+SettlementGuard anchors enforcement decisions to Canton using Daml contracts under `canton/daml/SettlementGuard/CommitmentRegistry.daml`. The backend integration is implemented in `backend/src/canton-ledger.ts` and talks to the Canton JSON Ledger API v2.
+
+### Environment Variables (Backend)
+
+- `CANTON_LEDGER_API_URL` — Canton JSON API base URL (e.g., http://localhost:7575)
+- `CANTON_SUBMITTER_PARTY` — Party for submitter (provisioned via JSON API)
+- `CANTON_CUSTODIAN_PARTY` — Party for custodian (provisioned via JSON API)
+- `CANTON_PACKAGE_ID` — DAR package hash (from `/v2/packages` after upload)
+
+If these are not set, anchoring falls back to DynamoDB/SQLite for local/demo operation. You can remove fallbacks to enforce strict on-ledger mode.
+
+### Local Dev Option A — DPM Sandbox
+
+Prereqs: JDK 17+, DPM installed.
+
+1. Build DAR
+   - `cd canton && dpm build`
+2. Start sandbox (JSON API on http://localhost:7575)
+   - `dpm sandbox`
+3. Provision parties, upload DAR, write `backend/.env.canton`
+   - `chmod +x canton/setup-canton.sh`
+   - `./canton/setup-canton.sh`
+4. Start backend with Canton env
+   - `set -a && source backend/.env.canton && set +a`
+   - `cd backend && npm run dev`
+5. Test end-to-end
+   - `curl http://localhost:3001/health`
+   - `API_BEARER_TOKEN=... node backend/scripts/e2e-test.mjs http://localhost:3001`
+   - `POST /v1/attestations/:id/anchor` returns real `transaction_id` and `contract_id`
+
+If local ports are busy, use Option B.
+
+### Local Dev Option B — CN Quickstart LocalNet
+
+1. `git clone https://github.com/digital-asset/cn-quickstart`
+2. `make install && make start`
+3. Point `CANTON_LEDGER_API_URL` to the JSON API from LocalNet, then repeat steps 3–5 above.
 
 ---
 

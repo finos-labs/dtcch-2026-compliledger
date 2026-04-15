@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
@@ -39,10 +38,10 @@ function getAnchorDb(): Database.Database {
   return anchorDb;
 }
 
-function buildAnchorFields(bundleRootHash: string, attestationHash: string, intentId: string) {
-  const commitmentId = `canton-${uuidv4().slice(0, 8)}`;
+function buildAnchorFields(_bundleRootHash: string, _attestationHash: string, _intentId: string) {
+  const commitmentId = `sg-anchor-${uuidv4()}`;
   const anchoredAt = new Date().toISOString();
-  const txHash = `0x${createHash("sha256").update(`${attestationHash}::${bundleRootHash}::${anchoredAt}`).digest("hex")}`;
+  const txHash = commitmentId;
   return { commitmentId, anchoredAt, txHash };
 }
 

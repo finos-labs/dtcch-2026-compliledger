@@ -422,8 +422,9 @@ app.get("/v1/public-key", (_req, res) => {
 });
 
 // GET /v1/canton/status — Canton Network connectivity and configuration
-app.get("/v1/canton/status", (_req, res) => {
-  res.json(getCantonNetworkStatus());
+app.get("/v1/canton/status", async (_req, res) => {
+  const status = await getCantonNetworkStatus();
+  res.json(status);
 });
 
 // GET /v1/canton/commitments/:attestationHash — Lookup a Canton commitment by attestation hash
