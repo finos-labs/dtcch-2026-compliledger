@@ -205,9 +205,12 @@ If local ports are busy, use Option B.
 
 ### Local Dev Option B — CN Quickstart LocalNet
 
-1. `git clone https://github.com/digital-asset/cn-quickstart`
-2. `make install && make start`
-3. Point `CANTON_LEDGER_API_URL` to the JSON API from LocalNet, then repeat steps 3–5 above.
+1. Clone and enter the repo
+   - `git clone https://github.com/digital-asset/cn-quickstart && cd cn-quickstart`
+2. Install and start the full LocalNet stack
+   - `make install && make start`
+3. The JSON Ledger API is available at `http://json-ledger-api.localhost` (port 7575 on some builds)
+4. Set `CANTON_LEDGER_API_URL=http://json-ledger-api.localhost` and repeat steps 3–5 above.
 
 ---
 
@@ -372,6 +375,12 @@ AWS_REGION=us-east-2
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
 BEDROCK_MODEL_ID=us.amazon.nova-micro-v1:0
+
+# Canton JSON Ledger API (set after running canton/setup-canton.sh)
+CANTON_LEDGER_API_URL=http://localhost:7575
+CANTON_SUBMITTER_PARTY=
+CANTON_CUSTODIAN_PARTY=
+CANTON_PACKAGE_ID=
 CANTON_DOMAIN=global-synchronizer.canton.network
 CANTON_PARTICIPANT=sg-participant-01
 DYNAMO_TABLE=sg-commitment-registry

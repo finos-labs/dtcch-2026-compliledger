@@ -83,6 +83,7 @@ export async function anchorToCantonLedger(
               bundleRootHash,
               assetType,
               schemaVersion:  SCHEMA_VERSION,
+              createdAt:      new Date().toISOString(),
             },
           },
         },

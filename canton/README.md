@@ -15,24 +15,44 @@ that neither party can alter alone.
 - JDK 17+ (`brew install openjdk@17`)
 - DPM (`curl https://get.digitalasset.com/install/install.sh | sh`)
 
-## Local Dev (Canton Sandbox)
+## Local Dev Option A — DPM Sandbox
 
 ```bash
-# 1. Build the Daml DAR
+# 1. Install DPM (if not already installed)
+#    Mac/Linux: curl https://get.digitalasset.com/install/install.sh | sh
+#    Then add to PATH: export PATH="$HOME/.dpm/bin:$PATH"
+
+# 2. Build the Daml DAR (compiles to .daml/dist/settlement-guard-1.0.0.dar)
 cd canton
 dpm build
 
-# 2. Start the Canton sandbox (JSON API on :7575, gRPC on :6866)
+# 3. Start the Canton sandbox (JSON API on :7575, gRPC on :6866)
 dpm sandbox &
 
-# 3. Provision parties, upload DAR, write .env.canton
+# 4. Provision parties, upload DAR, write .env.canton
 chmod +x setup-canton.sh
 ./setup-canton.sh
 
-# 4. Source env + start backend
+# 5. Source env + start backend
 set -a && source ../backend/.env.canton && set +a
 cd ../backend && npm run dev
 ```
+
+## Local Dev Option B — CN Quickstart LocalNet
+
+For a full multi-participant network with wallet and scan UIs:
+
+```bash
+# Clone the quickstart repo and enter it
+git clone https://github.com/digital-asset/cn-quickstart
+cd cn-quickstart
+
+# Install dependencies and start the full LocalNet stack
+make install && make start
+```
+
+The JSON Ledger API is then at `http://json-ledger-api.localhost` (port 7575 on some builds).
+Set `CANTON_LEDGER_API_URL=http://json-ledger-api.localhost` and run steps 4–5 from Option A.
 
 ## Environment Variables
 
