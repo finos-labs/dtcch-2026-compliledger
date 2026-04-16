@@ -78,16 +78,26 @@ In API responses, `decision_type: "evaluation"` accompanies OSS rule evaluation 
 
 SettlementGuard operates **before execution and settlement**, as an independent attestation layer:
 
-```
-Transaction Intent
-        ↓
-SettlementGuard  (evaluate → attest)
-        ↓
-External System  (decision-making)
-        ↓
-Execution        (broker-dealer / platform)
-        ↓
-Clearing & Settlement  (e.g., DTCC)
+```mermaid
+flowchart TD
+    TI(["📨 Transaction Intent"])
+
+    subgraph SG["SettlementGuard — Independent Attestation Layer"]
+        direction LR
+        EVAL["Evaluate\nDeterministic Rule Engine"]
+        ATTEST["Attest\nEd25519 Signed Proof Bundle"]
+        ANCHOR["Anchor  ·  optional\nCanton Daml Commitment"]
+        EVAL --> ATTEST --> ANCHOR
+    end
+
+    EXT["External System\nDecision-Making"]
+    EXEC["Execution\nBroker-Dealer / Platform"]
+    CLR["Clearing & Settlement\nDTCC / CSD"]
+
+    TI --> EVAL
+    ANCHOR --> EXT
+    ATTEST -. verification available .-> EXT
+    EXT --> EXEC --> CLR
 ```
 
 SettlementGuard is **not** part of the execution path.
@@ -108,31 +118,50 @@ SettlementGuard rule packs align with established market standards. These standa
 
 ---
 
-## Architecture
+## System Architecture
 
-```
-Transaction Intent Submitted
-         │
-         ▼
-┌─────────────────────────────────┐
-│     Canonical Proof Chain       │
-│  1. Issuer Legitimacy           │
-│  2. Asset Classification        │
-│  3. Custody Conditions          │
-│  4. Reserve & Backing           │
-└─────────────────────────────────┘
-         │
-         ▼
-Proof Bundle Sealed  (SHA-256 Merkle root)
-         │
-         ▼
-Attestation Signed  (Ed25519)
-         │
-         ▼
-Canton Commitment Anchored  (optional, Global Synchronizer)
-         │
-         ▼
-AI Compliance Reasoning  (optional, AWS Bedrock Nova Micro)
+```mermaid
+graph TD
+    subgraph FE["🖥️  FRONTEND — Next.js 15 / React / Tailwind"]
+        UI["Compliance Console"]
+        PROXY["API Proxy  /api/v1"]
+    end
+
+    subgraph BE["⚙️  BACKEND SERVICES — Node.js / Express / TypeScript"]
+        API["REST API\nserver.ts"]
+        CHAIN["Proof Chain Engine\nproof-chain.ts"]
+        ATT["Attestation Issuer\nattestation.ts  ·  Ed25519"]
+        OSS["Rule Engine\nossRuleEvaluator.ts"]
+        CANTON_A["Canton Adapter\ncanton-ledger.ts"]
+        DYN_A["Persistence Adapter\ndynamo-anchor.ts"]
+        BR["AI Reasoning\nbedrock-reasoning.ts"]
+    end
+
+    subgraph CANTON["🔷  CANTON NETWORK — Global Synchronizer"]
+        JAPI["JSON Ledger API v2\n:7575"]
+        SC["SettlementCommitment\nDaml Contract"]
+        AC["AnchoredCommitment\nDaml Contract"]
+    end
+
+    subgraph AWS["☁️  AWS"]
+        BEDROCK["Amazon Bedrock\nNova Micro"]
+        DDB["DynamoDB\nsg-commitment-registry"]
+        SQLITE["SQLite\nlocal fallback"]
+    end
+
+    UI -->|HTTP| PROXY
+    PROXY -->|fetch| API
+    API --> CHAIN --> ATT --> API
+    API --> OSS
+    API -->|anchor request| CANTON_A
+    API -->|reasoning| BR
+    CANTON_A -->|submit-and-wait| JAPI
+    JAPI --> SC
+    SC -->|AnchorCommitment choice| AC
+    CANTON_A -.->|fallback| DYN_A
+    DYN_A -.-> DDB
+    DYN_A -.-> SQLITE
+    BR --> BEDROCK
 ```
 
 ### Architecture Highlights
@@ -158,6 +187,71 @@ AI Compliance Reasoning  (optional, AWS Bedrock Nova Micro)
 
 ---
 
+## Settlement User Flow
+
+End-to-end lifecycle from intent submission through proof evaluation, on-chain anchoring, optional AI reasoning, and independent verification.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 👤 User
+    participant FE as 🖥️ Frontend
+    participant API as ⚙️ Backend API
+    participant PC as Proof Chain
+    participant AT as Attestation
+    participant CL as Canton Ledger
+    participant AI as Bedrock AI
+
+    rect rgb(20, 45, 90)
+        Note over U,AT: PHASE 1 — INTENT SUBMISSION
+        U->>FE: Submit transaction scenario
+        FE->>API: POST /v1/intents
+        API->>PC: Execute 4-step proof chain
+        PC->>PC: Step 1 · Issuer Legitimacy
+        PC->>PC: Step 2 · Asset Classification
+        PC->>PC: Step 3 · Custody Conditions
+        PC->>PC: Step 4 · Reserve and Backing
+        PC-->>API: 4 proof steps + SHA-256 hashes
+        API->>AT: Seal bundle — Merkle root
+        AT->>AT: Sign with Ed25519
+        AT-->>API: Signed attestation
+        API-->>FE: decision + attestation + bundle_root_hash
+        FE-->>U: Compliance result displayed
+    end
+
+    rect rgb(20, 80, 45)
+        Note over U,CL: PHASE 2 — CANTON ANCHORING  (ALLOW results only)
+        U->>FE: Click Anchor Commitment
+        FE->>API: POST /v1/attestations/:id/anchor
+        API->>CL: POST /v2/commands/submit-and-wait
+        Note right of CL: Creates SettlementCommitment Daml contract
+        CL-->>API: transaction_id + contract_id
+        API-->>FE: Canton commitment confirmed
+        FE-->>U: On-chain attestation hash returned
+    end
+
+    rect rgb(70, 30, 70)
+        Note over U,AI: PHASE 3 — AI REASONING  (optional)
+        U->>FE: Request explanation
+        FE->>API: POST /v1/reasoning/:id
+        API->>AI: Invoke Nova Micro
+        AI-->>API: Natural-language compliance analysis
+        API-->>FE: Reasoning text
+        FE-->>U: Plain-language explanation
+    end
+
+    rect rgb(70, 50, 10)
+        Note over U,CL: PHASE 4 — INDEPENDENT VERIFICATION
+        U->>API: POST /v1/verify
+        API->>API: Verify Ed25519 signature
+        API->>CL: GET /v1/canton/commitments/:hash
+        CL-->>API: On-chain contract record
+        API-->>U: Verification result — valid or invalid
+    end
+```
+
+---
+
 ## Canonical Proof Chain
 
 | Step | Check | Key Inputs |
@@ -168,6 +262,41 @@ AI Compliance Reasoning  (optional, AWS Bedrock Nova Micro)
 | 4 | **Reserve & Backing** | Reserve ratio (must be ≥ 1.0), audit date, backing assets |
 
 Each step produces a SHA-256 hash of its normalized inputs. The chain never changes order and produces reproducible, independently verifiable results.
+
+```mermaid
+flowchart LR
+    IN(["Settlement Intent\nJSON Input"])
+
+    subgraph CHAIN["Canonical Proof Chain — Fixed Order · Deterministic"]
+        S1["Step 1\nIssuer Legitimacy\nname · jurisdiction · license"]
+        S2["Step 2\nAsset Classification\ntype · category · ruleset"]
+        S3["Step 3\nCustody Conditions\ncustodian · segregation · encumbrance"]
+        S4["Step 4\nReserve and Backing\nratio ≥ 1.0 · audit date · assets"]
+    end
+
+    H1["SHA-256\nHash 1"]
+    H2["SHA-256\nHash 2"]
+    H3["SHA-256\nHash 3"]
+    H4["SHA-256\nHash 4"]
+
+    MR["Bundle Root Hash\nSHA-256 of H1 ‖ H2 ‖ H3 ‖ H4"]
+
+    DEC{"All steps\nPASS?"}
+
+    ATT["Ed25519 Attestation\nIssued\ndecision = ALLOW"]
+    DENY["No Attestation\ndecision = DENY"]
+    ANCHOR["Canton Anchor\nSettlementCommitment\nDaml Contract"]
+
+    IN --> S1 --> H1
+    IN --> S2 --> H2
+    IN --> S3 --> H3
+    IN --> S4 --> H4
+    H1 & H2 & H3 & H4 --> MR
+    MR --> DEC
+    DEC -->|Yes| ATT
+    DEC -->|No| DENY
+    ATT --> ANCHOR
+```
 
 ---
 
@@ -277,6 +406,30 @@ SettlementGuard anchors compliance commitments to Canton using Daml contracts de
 | `CANTON_PACKAGE_ID` | DAR package hash (from `canton/setup-canton.sh`) |
 
 If these are not set, anchoring falls back to DynamoDB / SQLite for local operation.
+
+### Canton Commitment Lifecycle
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> IntentSubmitted : POST /v1/intents
+
+    IntentSubmitted --> ProofChainRunning : Proof chain executes
+    ProofChainRunning --> BundleSealed : 4 steps evaluated + hashed
+    BundleSealed --> AttestationIssued : decision = ALLOW
+    BundleSealed --> Denied : decision = DENY
+
+    AttestationIssued --> AnchorPending : POST /v1/attestations/:id/anchor
+    AnchorPending --> SettlementCommitment : Canton submit-and-wait OK
+    SettlementCommitment --> AnchoredCommitment : AnchorCommitment choice custodian co-signs
+    AnchoredCommitment --> Verified : POST /v1/verify or GET /canton/commitments/:hash
+
+    AnchorPending --> DynamoFallback : Canton unavailable
+    DynamoFallback --> Verified : DynamoDB lookup
+
+    Denied --> [*]
+    Verified --> [*]
+```
 
 ### Local Dev Option A — DPM Sandbox
 
@@ -403,6 +556,58 @@ dtcch-2026-compliledger/
 │   └── icma-repo.json               # ICMA repo check example payload
 ├── .env.example                     # Environment variable template
 └── README.md
+```
+
+---
+
+## Component Architecture
+
+```mermaid
+graph LR
+    subgraph FE_P["📄 Frontend — Pages"]
+        LP["Landing Page\napp/page.tsx"]
+        CC["Compliance Console\napp/app/page.tsx"]
+    end
+
+    subgraph FE_L["📦 Frontend — Libraries"]
+        APIC["API Client\nlib/api.ts"]
+        PRXY["API Proxy\napi/v1/proxy"]
+    end
+
+    subgraph SRV_C["🔧 Backend — Core"]
+        SRV["server.ts\nExpress REST API"]
+        PC["proof-chain.ts\n4-step evaluator"]
+        ATT["attestation.ts\nEd25519 issuer"]
+        BND["bundle.ts\nMerkle sealer"]
+        CR["crypto.ts\nSHA-256 + Ed25519"]
+    end
+
+    subgraph SRV_A["🔌 Backend — Adapters"]
+        CLA["canton-ledger.ts\nJSON API v2"]
+        DA["dynamo-anchor.ts\nDynamoDB / SQLite"]
+        BRA["bedrock-reasoning.ts\nAWS Nova Micro"]
+    end
+
+    subgraph SRV_R["📏 Backend — Rule Engine"]
+        OSS["ossRuleEvaluator.ts"]
+        REG["ruleRegistry.ts"]
+        IM["isda/margin.ts"]
+        IC["isla/collateral.ts"]
+        IR["icma/repo.ts"]
+    end
+
+    subgraph DAML["🔷 Canton — Daml Contracts"]
+        SC["SettlementCommitment\nCommitmentRegistry.daml"]
+        AC["AnchoredCommitment\nCommitmentRegistry.daml"]
+    end
+
+    LP & CC --> APIC --> PRXY --> SRV
+    SRV --> PC & ATT & BND
+    PC & ATT & BND --> CR
+    SRV --> CLA & DA & BRA
+    SRV --> OSS --> REG --> IM & IC & IR
+    CLA -->|submit-and-wait| SC
+    SC -->|AnchorCommitment| AC
 ```
 
 ---
