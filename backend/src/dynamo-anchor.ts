@@ -41,23 +41,25 @@ function getAnchorDb(): Database.Database {
 function buildAnchorFields(_bundleRootHash: string, _attestationHash: string, _intentId: string) {
   const commitmentId = `sg-anchor-${uuidv4()}`;
   const anchoredAt = new Date().toISOString();
-  const txHash = commitmentId;
-  return { commitmentId, anchoredAt, txHash };
+  return { commitmentId, anchoredAt };
 }
 
 function anchorToSqlite(
   bundleRootHash: string,
   attestationHash: string,
   intentId: string,
-  assetType: string
+  assetType: string,
+  cantonTxHash?: string
 ): AnchorRecord {
-  const { commitmentId, anchoredAt, txHash } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
+  const { commitmentId, anchoredAt } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
+  const txHash = cantonTxHash ?? null;
+  const network = cantonTxHash ? "canton-global-synchronizer" : "local-fallback";
   const db = getAnchorDb();
   db.prepare(`
     INSERT OR IGNORE INTO anchors (attestation_hash, bundle_root_hash, commitment_id, tx_hash, intent_id, asset_type, anchored_at, network)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(attestationHash, bundleRootHash, commitmentId, txHash, intentId, assetType, anchoredAt, "canton-global-synchronizer");
-  return { commitment_id: commitmentId, tx_hash: txHash, anchored_at: anchoredAt, bundle_root_hash: bundleRootHash, attestation_hash: attestationHash };
+  `).run(attestationHash, bundleRootHash, commitmentId, txHash, intentId, assetType, anchoredAt, network);
+  return { commitment_id: commitmentId, tx_hash: txHash ?? commitmentId, anchored_at: anchoredAt, bundle_root_hash: bundleRootHash, attestation_hash: attestationHash };
 }
 
 function lookupSqliteByAttestation(attestationHash: string): AnchorRecord | null {
@@ -76,19 +78,21 @@ export async function anchorToDynamo(
   bundleRootHash: string,
   attestationHash: string,
   intentId: string,
-  assetType: string
+  assetType: string,
+  cantonTxHash?: string
 ): Promise<AnchorRecord> {
-  const { commitmentId, anchoredAt, txHash } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
+  const { commitmentId, anchoredAt } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
+  const network = cantonTxHash ? "canton-global-synchronizer" : "local-fallback";
 
   const item = {
     attestation_hash: attestationHash,
     bundle_root_hash: bundleRootHash,
     commitment_id: commitmentId,
-    tx_hash: txHash,
+    tx_hash: cantonTxHash ?? null,
     intent_id: intentId,
     asset_type: assetType,
     anchored_at: anchoredAt,
-    network: "canton-global-synchronizer",
+    network,
   };
 
   try {
@@ -101,14 +105,14 @@ export async function anchorToDynamo(
     );
   } catch (err: unknown) {
     console.warn("DynamoDB write failed, using SQLite fallback:", (err as Error).message);
-    return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType);
+    return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
   }
 
-  anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType);
+  anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
 
   return {
     commitment_id: commitmentId,
-    tx_hash: txHash,
+    tx_hash: cantonTxHash ?? commitmentId,
     anchored_at: anchoredAt,
     bundle_root_hash: bundleRootHash,
     attestation_hash: attestationHash,

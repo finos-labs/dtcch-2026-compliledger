@@ -35,6 +35,7 @@ function initSchema(database: Database.Database): void {
       attestation_hash TEXT,
       signature TEXT,
       anchor_json TEXT,
+      anchor_status TEXT DEFAULT 'none',
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -95,16 +96,38 @@ export function getIntentByAttestationHash(attestationHash: string): IntentRecor
 
 export function updateAnchor(id: string, anchor: AnchorRecord): void {
   const database = getDb();
-  database.prepare("UPDATE intents SET anchor_json = ? WHERE id = ?").run(
+  database.prepare("UPDATE intents SET anchor_json = ?, anchor_status = 'anchored' WHERE id = ?").run(
     JSON.stringify(anchor),
     id
   );
 }
 
-export function getAllIntents(): IntentRecord[] {
+export function setAnchorStatus(id: string, status: "pending" | "anchored" | "failed" | "none"): void {
   const database = getDb();
-  const rows = database.prepare("SELECT * FROM intents ORDER BY created_at DESC").all() as Record<string, string>[];
-  return rows.map(rowToRecord);
+  database.prepare("UPDATE intents SET anchor_status = ? WHERE id = ?").run(status, id);
+}
+
+export function getAllIntents(limit = 50, cursor?: string): { items: IntentRecord[]; next_cursor: string | null } {
+  const database = getDb();
+  let rows: Record<string, string>[];
+
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+
+  if (cursor) {
+    rows = database
+      .prepare("SELECT * FROM intents WHERE created_at < ? ORDER BY created_at DESC LIMIT ?")
+      .all(cursor, safeLimit + 1) as Record<string, string>[];
+  } else {
+    rows = database
+      .prepare("SELECT * FROM intents ORDER BY created_at DESC LIMIT ?")
+      .all(safeLimit + 1) as Record<string, string>[];
+  }
+
+  const hasMore = rows.length > safeLimit;
+  const page = hasMore ? rows.slice(0, safeLimit) : rows;
+  const nextCursor = hasMore ? page[page.length - 1].created_at : null;
+
+  return { items: page.map(rowToRecord), next_cursor: nextCursor };
 }
 
 function rowToRecord(row: Record<string, string>): IntentRecord {

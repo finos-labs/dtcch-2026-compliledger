@@ -13,6 +13,92 @@ export interface SettlementIntent {
   custody_provider: string;
   custody_valid: boolean;
   reserve_ratio: number;
+  lei?: string;
+  counterparty_lei?: string;
+  notional_amount?: number;
+  notional_currency?: string;
+  settlement_date?: string;
+  settlement_cycle?: "T0" | "T1" | "T2" | "T3";
+  isin?: string;
+  collateral_items?: CollateralItem[];
+}
+
+export interface CollateralItem {
+  isin: string;
+  description: string;
+  market_value: number;
+  currency: string;
+  haircut: number;
+  issuer_lei?: string;
+  country?: string;
+  sector?: string;
+}
+
+export interface ConcentrationLimit {
+  dimension: "issuer" | "country" | "sector";
+  key: string;
+  max_pct: number;
+}
+
+export interface ConcentrationCheckResult {
+  passed: boolean;
+  breaches: Array<{ dimension: string; key: string; actual_pct: number; limit_pct: number }>;
+}
+
+export interface LEIRecord {
+  lei: string;
+  entity_status: "ACTIVE" | "INACTIVE" | "ANNULLED";
+  legal_name: string;
+  jurisdiction: string;
+}
+
+export interface FIGIRecord {
+  figi: string;
+  isin: string;
+  security_type: string;
+  market_sector: string;
+  name: string;
+}
+
+export interface SanctionsMatch {
+  list: string;
+  name: string;
+  score: number;
+}
+
+export interface SanctionsScreenResult {
+  screened: boolean;
+  matched: boolean;
+  matches: SanctionsMatch[];
+  screened_at: string;
+}
+
+export interface ReserveRatioResult {
+  ratio: number;
+  source: string;
+  verified: boolean;
+  as_of: string;
+}
+
+export type RegulatoryEventType =
+  | "INTENT_SUBMITTED"
+  | "ATTESTATION_ISSUED"
+  | "ANCHOR_COMPLETED"
+  | "VERIFY_REQUESTED"
+  | "SANCTIONS_SCREENED"
+  | "ORACLE_CALLED"
+  | "ANCHOR_FAILED";
+
+export interface RegulatoryEvent {
+  event_id: string;
+  correlation_id: string;
+  event_type: RegulatoryEventType;
+  timestamp: string;
+  actor: string;
+  data_hash: string;
+  regulation_refs: string[];
+  outcome: "SUCCESS" | "FAILURE" | "CONDITIONAL";
+  metadata: Record<string, unknown>;
 }
 
 export interface ProofStepResult {

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import nacl from "tweetnacl";
 import naclUtil from "tweetnacl-util";
+import { signWithKMS, getKMSPublicKey, isKMSEnabled, getKMSKeyMetadata } from "./signing/kms-signer";
 
 let keyPair: nacl.SignKeyPair | null = null;
 
@@ -72,9 +73,29 @@ export function getPublicKeyB64(): string {
 }
 
 export function getSigningKeyId(): string {
+  if (isKMSEnabled()) return getKMSKeyMetadata().key_id;
   return process.env.SG_KEY_ID || DEFAULT_KEY_ID;
 }
 
 export function getSigningKeyVersion(): string {
+  if (isKMSEnabled()) return getKMSKeyMetadata().algorithm;
   return process.env.SG_KEY_VERSION || DEFAULT_KEY_VERSION;
+}
+
+export async function signDataAsync(dataHash: string): Promise<string> {
+  if (isKMSEnabled()) {
+    return signWithKMS(dataHash);
+  }
+  return signData(dataHash);
+}
+
+export async function getPublicKeyAsync(): Promise<string> {
+  if (isKMSEnabled()) {
+    return getKMSPublicKey();
+  }
+  return getPublicKeyB64();
+}
+
+export function getSigningProvider(): "kms" | "local-ed25519" {
+  return isKMSEnabled() ? "kms" : "local-ed25519";
 }

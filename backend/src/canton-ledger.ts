@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
+import jwt from "jsonwebtoken";
 import type { AnchorRecord } from "./types";
 import { anchorToDynamo, lookupByAttestationHash as dynamoLookup } from "./dynamo-anchor";
+import { logger } from "./logger";
 
 const CANTON_LEDGER_API   = process.env.CANTON_LEDGER_API_URL || "http://localhost:7575";
 const CANTON_SUBMITTER    = process.env.CANTON_SUBMITTER_PARTY || "";
@@ -9,6 +11,8 @@ const CANTON_PACKAGE_ID   = process.env.CANTON_PACKAGE_ID || "";
 const CANTON_DOMAIN       = process.env.CANTON_DOMAIN || "global-synchronizer.canton.network";
 const CANTON_PARTICIPANT  = process.env.CANTON_PARTICIPANT || "sg-participant-01";
 const SCHEMA_VERSION      = "sg-v1";
+const CANTON_JWT_SECRET   = process.env.CANTON_JWT_SECRET || "";
+const CANTON_JWT_AUDIENCE = process.env.CANTON_JWT_AUDIENCE || "https://daml.com/ledger-api";
 
 const TEMPLATE_ID = CANTON_PACKAGE_ID
   ? `${CANTON_PACKAGE_ID}:SettlementGuard.CommitmentRegistry:SettlementCommitment`
@@ -48,16 +52,81 @@ function cantonAvailable(): boolean {
   return Boolean(CANTON_SUBMITTER && CANTON_CUSTODIAN);
 }
 
-async function cantonPost(path: string, body: unknown): Promise<Response> {
+function buildCantonJWT(actingParty: string): string | null {
+  if (!CANTON_JWT_SECRET) return null;
+  return jwt.sign(
+    {
+      sub: actingParty,
+      aud: CANTON_JWT_AUDIENCE,
+      actAs: [actingParty],
+      readAs: [CANTON_SUBMITTER, CANTON_CUSTODIAN].filter(Boolean),
+      admin: false,
+    },
+    CANTON_JWT_SECRET,
+    { expiresIn: "5m", issuer: "settlementguard" }
+  );
+}
+
+function cantonHeaders(actingParty?: string): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = buildCantonJWT(actingParty ?? CANTON_SUBMITTER);
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
+async function cantonPost(path: string, body: unknown, actingParty?: string): Promise<Response> {
   return fetch(`${CANTON_LEDGER_API}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: cantonHeaders(actingParty),
     body: JSON.stringify(body),
   });
 }
 
 async function cantonGet(path: string): Promise<Response> {
-  return fetch(`${CANTON_LEDGER_API}${path}`);
+  const headers = cantonHeaders();
+  delete headers["Content-Type"];
+  return fetch(`${CANTON_LEDGER_API}${path}`, { headers });
+}
+
+async function readStreamingContracts(
+  resp: Response,
+  attestationHash: string
+): Promise<{ contractId: string; createArguments: Record<string, unknown> } | null> {
+  if (!resp.body) return null;
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+          const contract = parsed.activeContract ?? parsed;
+          const args = (contract as Record<string, unknown>).createArguments as Record<string, unknown> | undefined;
+          const cid = (contract as Record<string, unknown>).contractId as string | undefined;
+          if (args?.attestationHash === attestationHash && cid) {
+            reader.cancel();
+            return { contractId: cid, createArguments: args };
+          }
+        } catch {
+          /* partial JSON line — continue buffering */
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "Canton ACS stream read error");
+  }
+  return null;
 }
 
 export async function anchorToCantonLedger(
@@ -125,6 +194,33 @@ export async function anchorToCantonLedger(
       bundle_root_hash: bundleRootHash,
       attestation_hash: attestationHash,
     };
+
+    if (contractId) {
+      try {
+        const exerciseBody = {
+          commands: [{
+            ExerciseCommand: {
+              templateId: TEMPLATE_ID,
+              contractId,
+              choice: "AnchorCommitment",
+              choiceArgument: {},
+            },
+          }],
+          workflowId,
+          commandId: `${commandId}-anchor`,
+          actAs: [CANTON_CUSTODIAN],
+          readAs: [CANTON_SUBMITTER],
+        };
+        const anchorResp = await cantonPost("/v2/commands/submit-and-wait", exerciseBody, CANTON_CUSTODIAN);
+        if (!anchorResp.ok) {
+          logger.warn({ status: anchorResp.status }, "AnchorCommitment choice failed — SettlementCommitment still recorded");
+        } else {
+          logger.info({ contractId }, "AnchorCommitment choice exercised — dual-party commitment confirmed");
+        }
+      } catch (err) {
+        logger.warn({ err: (err as Error).message }, "AnchorCommitment exercise failed — continuing");
+      }
+    }
 
     await anchorToDynamo(bundleRootHash, attestationHash, intentId, assetType)
       .catch(() => {});
@@ -196,10 +292,7 @@ export async function lookupCantonCommitment(
       });
 
       if (resp.ok) {
-        const data = await resp.json() as { activeContracts?: Array<{ contractId: string; createArguments: Record<string, unknown> }> };
-        const match = data.activeContracts?.find(
-          (c) => c.createArguments?.attestationHash === attestationHash
-        );
+        const match = await readStreamingContracts(resp, attestationHash);
 
         if (match) {
           const args = match.createArguments;

@@ -4,12 +4,12 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { v4 as uuidv4 } from "uuid";
 import type { SettlementIntent, VerifyRequest, VerifyResponse, AnchorRecord, SettlementDecisionResult } from "./types";
-import { canonicalStringify, sha256, verifySignature, getPublicKeyB64, getSigningKeyId, getSigningKeyVersion } from "./crypto";
+import { canonicalStringify, sha256, verifySignature, getPublicKeyB64, getPublicKeyAsync, getSigningKeyId, getSigningKeyVersion, getSigningProvider } from "./crypto";
 import { executeProofChain } from "./proof-chain";
 import { sealBundle } from "./bundle";
 import { computeDecision } from "./decision";
 import { issueAttestation, recomputeAttestationHash } from "./attestation";
-import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents } from "./db";
+import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents, setAnchorStatus } from "./db";
 import { PRESETS } from "./presets";
 import { RuleRegistry, ruleRegistry } from "./engine/ruleRegistry";
 import { evaluateRules, evaluateSettlementDecision } from "./engine/decisionProvider";
@@ -18,40 +18,50 @@ import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } 
 import { generateComplianceReasoning } from "./bedrock-reasoning";
 import { evaluate, type RulePack } from "./engine/ossRuleEvaluator";
 import type { OssEvaluation } from "./types";
+import { logger } from "./logger";
+import { guardStartup, requireAuth } from "./middleware/auth";
+import type { AuthenticatedRequest } from "./middleware/auth";
+import { writeRegulatoryEvent, getRegulatoryEvents } from "./audit/regulatory-log";
+import { cantonCircuit, bedrockCircuit } from "./circuit-breaker";
+
+guardStartup();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || "32kb";
-const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN;
 
-app.use(cors());
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+  : [];
+
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS.length > 0
+      ? (origin, cb) => {
+          if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
+          else cb(new Error(`CORS: origin ${origin} not allowed`));
+        }
+      : true,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-Correlation-Id"],
+  })
+);
+
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
+
+app.use((req: AuthenticatedRequest, _res, next) => {
+  (req as AuthenticatedRequest & { correlationId: string }).correlationId =
+    (req.headers["x-correlation-id"] as string) || uuidv4();
+  next();
+});
 
 const postRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: Math.max(Number(process.env.POST_RATE_LIMIT_MAX || 1000), 1000),
+  max: Number(process.env.POST_RATE_LIMIT_MAX || 500),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Rate limit exceeded" },
 });
-
-function requireBearerToken(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!API_BEARER_TOKEN) {
-    next();
-    return;
-  }
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Missing bearer token" });
-    return;
-  }
-  const token = header.slice("Bearer ".length);
-  if (token !== API_BEARER_TOKEN) {
-    res.status(401).json({ error: "Invalid bearer token" });
-    return;
-  }
-  next();
-}
 
 app.use("/v1/intents", postRateLimiter);
 app.use("/v1/verify", postRateLimiter);
@@ -59,12 +69,12 @@ app.use("/v1/attestations", postRateLimiter);
 app.use("/v1/reasoning", postRateLimiter);
 app.use("/v1/demo/evaluate", postRateLimiter);
 
-app.post("/v1/intents", requireBearerToken);
-app.post("/v1/intents/preset/:presetId", requireBearerToken);
-app.post("/v1/verify", requireBearerToken);
-app.post("/v1/attestations/:id/anchor", requireBearerToken);
-app.post("/v1/reasoning/:id", requireBearerToken);
-app.post("/v1/demo/evaluate", requireBearerToken);
+app.post("/v1/intents", requireAuth);
+app.post("/v1/intents/preset/:presetId", requireAuth);
+app.post("/v1/verify", requireAuth);
+app.post("/v1/attestations/:id/anchor", requireAuth);
+app.post("/v1/reasoning/:id", requireAuth);
+app.post("/v1/demo/evaluate", requireAuth);
 
 /** Extract and run an optional OSS rule evaluation from a request body. */
 function resolveOssEvaluation(body: Record<string, unknown>): OssEvaluation | undefined {
@@ -131,7 +141,8 @@ function validateIntent(body: unknown): { valid: boolean; error?: string; intent
 }
 
 // POST /v1/intents — Submit a settlement intent for enforcement
-app.post("/v1/intents", (req, res) => {
+app.post("/v1/intents", async (req: AuthenticatedRequest, res) => {
+  const correlationId = (req as AuthenticatedRequest & { correlationId: string }).correlationId;
   const validation = validateIntent(req.body);
   if (!validation.valid || !validation.intent) {
     res.status(400).json({ error: validation.error });
@@ -143,44 +154,39 @@ app.post("/v1/intents", (req, res) => {
   const receivedAt = new Date().toISOString();
   const intentHash = sha256(canonicalStringify(intent));
 
-  // Execute the Canonical Proof Chain
-  const steps = executeProofChain(intent);
+  const steps = await executeProofChain(intent);
 
-  // Optional OSS rule evaluation — runs when the caller supplies rule_pack + rule_pack_payload
   const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
-
-  // Evaluate settlement decision before proof generation (embedded in bundle metadata)
   const settlementDecision = resolveSettlementDecision(req.body as Record<string, unknown>, intentId);
-
-  // Seal the proof bundle (oss_evaluation and settlement_decision are included before hashing when present)
   const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation, settlementDecision);
-
-  // Compute decision
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
-  // Issue attestation only if ALLOW
   let signedAttestation = null;
   if (decisionRecord.decision === "ALLOW") {
-    signedAttestation = issueAttestation(
-      intentId,
-      intentHash,
-      bundle.bundle_root_hash,
-      intent.asset_type
+    signedAttestation = issueAttestation(intentId, intentHash, bundle.bundle_root_hash, intent.asset_type);
+  }
+
+  saveIntent({ id: intentId, intent, intent_hash: intentHash, received_at: receivedAt, bundle, decision_record: decisionRecord, signed_attestation: signedAttestation, anchor: null });
+
+  writeRegulatoryEvent(
+    "INTENT_SUBMITTED",
+    correlationId,
+    decisionRecord.decision === "ALLOW" ? "SUCCESS" : "CONDITIONAL",
+    { intentId, intentHash, decision: decisionRecord.decision, asset_type: intent.asset_type },
+    { regulationRefs: ["DTCC-SG", "ISDA-CSA", "ISLA-GMSLA"] }
+  );
+
+  if (decisionRecord.decision === "ALLOW" && signedAttestation) {
+    writeRegulatoryEvent(
+      "ATTESTATION_ISSUED",
+      correlationId,
+      "SUCCESS",
+      { intentId, attestation_hash: signedAttestation.attestation_hash, bundle_root_hash: bundle.bundle_root_hash },
+      { regulationRefs: ["DTCC-SG"] }
     );
   }
 
-  // Persist
-  const record = {
-    id: intentId,
-    intent,
-    intent_hash: intentHash,
-    received_at: receivedAt,
-    bundle,
-    decision_record: decisionRecord,
-    signed_attestation: signedAttestation,
-    anchor: null,
-  };
-  saveIntent(record);
+  logger.info({ intentId, decision: decisionRecord.decision, correlationId }, "Intent processed");
 
   res.status(201).json({
     id: intentId,
@@ -194,15 +200,12 @@ app.post("/v1/intents", (req, res) => {
 });
 
 // POST /v1/intents/preset/:presetId — Run a preset scenario
-app.post("/v1/intents/preset/:presetId", (req, res) => {
-  const presetId = req.params.presetId;
+app.post("/v1/intents/preset/:presetId", async (req: AuthenticatedRequest, res) => {
+  const presetId = String(req.params.presetId);
   const preset = PRESETS[presetId];
 
   if (!preset) {
-    res.status(404).json({
-      error: `Unknown preset: ${presetId}`,
-      available: Object.keys(PRESETS),
-    });
+    res.status(404).json({ error: `Unknown preset: ${presetId}`, available: Object.keys(PRESETS) });
     return;
   }
 
@@ -211,56 +214,32 @@ app.post("/v1/intents/preset/:presetId", (req, res) => {
   const receivedAt = new Date().toISOString();
   const intentHash = sha256(canonicalStringify(intent));
 
-  const steps = executeProofChain(intent);
-
-  // Optional OSS rule evaluation — callers may supply rule_pack + rule_pack_payload
+  const steps = await executeProofChain(intent);
   const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
-
-  // Evaluate settlement decision before proof generation (embedded in bundle metadata)
   const settlementDecision = resolveSettlementDecision(req.body as Record<string, unknown>, intentId);
-
   const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation, settlementDecision);
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;
   if (decisionRecord.decision === "ALLOW") {
-    signedAttestation = issueAttestation(
-      intentId,
-      intentHash,
-      bundle.bundle_root_hash,
-      intent.asset_type
-    );
+    signedAttestation = issueAttestation(intentId, intentHash, bundle.bundle_root_hash, intent.asset_type);
   }
 
-  const record = {
-    id: intentId,
-    intent,
-    intent_hash: intentHash,
-    received_at: receivedAt,
-    bundle,
-    decision_record: decisionRecord,
-    signed_attestation: signedAttestation,
-    anchor: null,
-  };
-  saveIntent(record);
+  saveIntent({ id: intentId, intent, intent_hash: intentHash, received_at: receivedAt, bundle, decision_record: decisionRecord, signed_attestation: signedAttestation, anchor: null });
 
   res.status(201).json({
-    id: intentId,
-    preset_id: presetId,
-    intent,
-    intent_hash: intentHash,
-    received_at: receivedAt,
-    bundle,
-    decision_type: "enforcement",
-    decision: decisionRecord,
-    attestation: signedAttestation,
+    id: intentId, preset_id: presetId, intent, intent_hash: intentHash,
+    received_at: receivedAt, bundle, decision_type: "enforcement",
+    decision: decisionRecord, attestation: signedAttestation,
   });
 });
 
-// GET /v1/intents — List all intents
-app.get("/v1/intents", (_req, res) => {
-  const records = getAllIntents();
-  res.json({ intents: records });
+// GET /v1/intents — List intents (paginated)
+app.get("/v1/intents", (req, res) => {
+  const limit = Number(req.query.limit) || 50;
+  const cursor = req.query.cursor as string | undefined;
+  const result = getAllIntents(limit, cursor);
+  res.json({ intents: result.items, next_cursor: result.next_cursor });
 });
 
 // GET /v1/intents/:id — Get a specific intent record
@@ -351,15 +330,43 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
     return;
   }
 
+  const correlationId = (req as unknown as AuthenticatedRequest & { correlationId: string }).correlationId;
+
+  setAnchorStatus(record.id, "pending");
+
   try {
-    const result = await anchorToCantonLedger(
-      record.bundle.bundle_root_hash,
-      record.signed_attestation.attestation_hash,
-      record.id,
-      record.bundle.asset_type
+    const result = await cantonCircuit.fire(
+      () => anchorToCantonLedger(
+        record.bundle.bundle_root_hash,
+        record.signed_attestation!.attestation_hash,
+        record.id,
+        record.bundle.asset_type
+      ),
+      () => anchorToDynamo(
+        record.bundle.bundle_root_hash,
+        record.signed_attestation!.attestation_hash,
+        record.id,
+        record.bundle.asset_type
+      ).then((anchor) => ({
+        anchor,
+        canton_transaction: { transaction_id: anchor.tx_hash, contract_id: "", domain_id: "", participant_id: "", command_id: "", workflow_id: "", ledger_effective_time: anchor.anchored_at, record_time: anchor.anchored_at, template_id: "", payload: {} as import("./canton-ledger").CantonCommitmentPayload },
+        network: "dynamo-fallback",
+        domain: process.env.CANTON_DOMAIN || "",
+        participant: process.env.CANTON_PARTICIPANT || "",
+      }))
     );
 
     updateAnchor(record.id, result.anchor);
+
+    writeRegulatoryEvent(
+      "ANCHOR_COMPLETED",
+      correlationId,
+      "SUCCESS",
+      { intentId: record.id, tx_hash: result.anchor.tx_hash, network: result.network },
+      { regulationRefs: ["DTCC-SG", "Canton-DLT"] }
+    );
+
+    logger.info({ intentId: record.id, network: result.network, tx_hash: result.anchor.tx_hash }, "Intent anchored");
 
     res.json({
       anchored: true,
@@ -371,10 +378,12 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    setAnchorStatus(record.id, "failed");
+    writeRegulatoryEvent("ANCHOR_FAILED", correlationId, "FAILURE", { intentId: record.id, error: message }, {});
+    logger.error({ intentId: record.id, err: message }, "Anchor failed");
     if (message.includes("ConditionalCheckFailedException")) {
       res.status(409).json({ error: "Already anchored on-chain" });
     } else {
-      console.error("Anchor error:", err);
       res.status(500).json({ error: "Anchoring failed", details: message });
     }
   }
@@ -389,14 +398,12 @@ app.post("/v1/reasoning/:id", async (req, res) => {
   }
 
   try {
-    const reasoning = await generateComplianceReasoning(
-      record.intent,
-      record.bundle.steps,
-      record.decision_record.decision
+    const reasoning = await bedrockCircuit.fire(() =>
+      generateComplianceReasoning(record.intent, record.bundle.steps, record.decision_record.decision)
     );
     res.json(reasoning);
   } catch (err: unknown) {
-    console.error("Reasoning error:", err);
+    logger.error({ err: (err as Error).message }, "Reasoning error");
     res.status(500).json({ error: "AI reasoning generation failed" });
   }
 });
@@ -413,12 +420,21 @@ app.get("/v1/presets", (_req, res) => {
 });
 
 // GET /v1/public-key — Get the public key for signature verification
-app.get("/v1/public-key", (_req, res) => {
+app.get("/v1/public-key", async (_req, res) => {
+  const publicKey = await getPublicKeyAsync().catch(() => getPublicKeyB64());
   res.json({
-    public_key: getPublicKeyB64(),
+    public_key: publicKey,
     key_id: getSigningKeyId(),
     key_version: getSigningKeyVersion(),
+    provider: getSigningProvider(),
   });
+});
+
+// GET /v1/audit/:id — Regulatory event audit trail for a given intent
+app.get("/v1/audit/:id", requireAuth, (req, res) => {
+  const auditId = String(req.params.id);
+  const events = getRegulatoryEvents(auditId);
+  res.json({ correlation_id: auditId, events });
 });
 
 // GET /v1/canton/status — Canton Network connectivity and configuration
@@ -506,7 +522,7 @@ app.post("/v1/demo/evaluate", (req, res) => {
 
 // GET /health — Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "SettlementGuard", version: "0.2.0" });
+  res.json({ status: "ok", service: "SettlementGuard", version: "0.3.0" });
 });
 
 function getPresetDescription(id: string): string {
@@ -519,7 +535,28 @@ function getPresetDescription(id: string): string {
   return descriptions[id] || "";
 }
 
-app.listen(PORT, () => {
-  console.log(`SettlementGuard backend running on http://localhost:${PORT}`);
-  console.log(`Public key: ${getPublicKeyB64()}`);
+const server = app.listen(PORT, () => {
+  logger.info({ port: PORT, signing_provider: getSigningProvider() }, "SettlementGuard backend started");
+});
+
+function gracefulShutdown(signal: string): void {
+  logger.info({ signal }, "Shutdown signal received — closing server");
+  server.close(() => {
+    logger.info("HTTP server closed. Exiting.");
+    process.exit(0);
+  });
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err: err.message }, "Uncaught exception — shutting down");
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled promise rejection");
 });
