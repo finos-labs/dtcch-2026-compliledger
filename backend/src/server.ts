@@ -332,9 +332,8 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
 
   const correlationId = (req as unknown as AuthenticatedRequest & { correlationId: string }).correlationId;
 
-  setAnchorStatus(record.id, "pending");
-
   try {
+    setAnchorStatus(record.id, "pending");
     const result = await cantonCircuit.fire(
       () => anchorToCantonLedger(
         record.bundle.bundle_root_hash,

@@ -95,23 +95,24 @@ export async function anchorToDynamo(
     network,
   };
 
-  const controller = new AbortController();
-  const dynTimeout = setTimeout(() => controller.abort(), 8000);
+  const DDB_TIMEOUT_MS = 8000;
+  const ddbCall = docClient.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: item,
+      ConditionExpression: "attribute_not_exists(attestation_hash)",
+    })
+  );
+  const timeoutSignal = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("DynamoDB write timed out")), DDB_TIMEOUT_MS)
+  );
+  ddbCall.catch(() => {});
   try {
-    await docClient.send(
-      new PutCommand({
-        TableName: TABLE_NAME,
-        Item: item,
-        ConditionExpression: "attribute_not_exists(attestation_hash)",
-      }),
-      { abortSignal: controller.signal }
-    );
+    await Promise.race([ddbCall, timeoutSignal]);
   } catch (err: unknown) {
-    const msg = (err as Error).message ?? String(err);
+    const msg = err instanceof Error ? err.message : String(err);
     console.warn("DynamoDB write failed, using SQLite fallback:", msg);
     return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
-  } finally {
-    clearTimeout(dynTimeout);
   }
 
   try {
