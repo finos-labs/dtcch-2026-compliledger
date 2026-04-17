@@ -11,8 +11,10 @@ const CANTON_PACKAGE_ID   = process.env.CANTON_PACKAGE_ID || "";
 const CANTON_DOMAIN       = process.env.CANTON_DOMAIN || "global-synchronizer.canton.network";
 const CANTON_PARTICIPANT  = process.env.CANTON_PARTICIPANT || "sg-participant-01";
 const SCHEMA_VERSION      = "sg-v1";
-const CANTON_JWT_SECRET   = process.env.CANTON_JWT_SECRET || "";
-const CANTON_JWT_AUDIENCE = process.env.CANTON_JWT_AUDIENCE || "https://daml.com/ledger-api";
+const CANTON_JWT_SECRET      = process.env.CANTON_JWT_SECRET || "";
+const CANTON_JWT_PRIVATE_KEY = process.env.CANTON_JWT_PRIVATE_KEY || "";
+const CANTON_JWT_AUDIENCE    = process.env.CANTON_JWT_AUDIENCE || "https://daml.com/ledger-api";
+const CANTON_LEDGER_USER     = process.env.CANTON_LEDGER_USER || "sg-service-account";
 
 const TEMPLATE_ID = CANTON_PACKAGE_ID
   ? `${CANTON_PACKAGE_ID}:SettlementGuard.CommitmentRegistry:SettlementCommitment`
@@ -46,6 +48,7 @@ export interface CantonAnchorResult {
   network: string;
   domain: string;
   participant: string;
+  completion_offset?: string;
 }
 
 function cantonAvailable(): boolean {
@@ -53,18 +56,30 @@ function cantonAvailable(): boolean {
 }
 
 function buildCantonJWT(actingParty: string): string | null {
-  if (!CANTON_JWT_SECRET) return null;
-  return jwt.sign(
-    {
-      sub: actingParty,
-      aud: CANTON_JWT_AUDIENCE,
-      actAs: [actingParty],
-      readAs: [CANTON_SUBMITTER, CANTON_CUSTODIAN].filter(Boolean),
-      admin: false,
-    },
-    CANTON_JWT_SECRET,
-    { expiresIn: "5m", issuer: "settlementguard" }
-  );
+  const payload = {
+    sub:     CANTON_LEDGER_USER,
+    aud:     CANTON_JWT_AUDIENCE,
+    actAs:   [actingParty],
+    readAs:  [CANTON_SUBMITTER, CANTON_CUSTODIAN].filter(Boolean),
+    admin:   false,
+  };
+
+  if (CANTON_JWT_PRIVATE_KEY) {
+    return jwt.sign(payload, CANTON_JWT_PRIVATE_KEY, {
+      algorithm:  "RS256",
+      expiresIn:  "5m",
+      issuer:     "settlementguard",
+    });
+  }
+
+  if (CANTON_JWT_SECRET) {
+    return jwt.sign(payload, CANTON_JWT_SECRET, {
+      expiresIn: "5m",
+      issuer:    "settlementguard",
+    });
+  }
+
+  return null;
 }
 
 function cantonHeaders(actingParty?: string): Record<string, string> {
@@ -187,6 +202,8 @@ export async function anchorToCantonLedger(
 
     const anchoredAt = tx.effectiveAt ?? new Date().toISOString();
 
+    const completionOffset: string | undefined = (data as Record<string, unknown>).completionOffset as string | undefined;
+
     const anchor: AnchorRecord = {
       commitment_id:    commandId,
       tx_hash:          tx.transactionId,
@@ -249,6 +266,7 @@ export async function anchorToCantonLedger(
       network:     "canton-global-synchronizer",
       domain:      CANTON_DOMAIN,
       participant: CANTON_PARTICIPANT,
+      completion_offset: completionOffset,
     };
   }
 
@@ -276,11 +294,21 @@ export async function anchorToCantonLedger(
 }
 
 export async function lookupCantonCommitment(
-  attestationHash: string
+  attestationHash: string,
+  activeAtOffset?: string
 ): Promise<{ anchor: AnchorRecord; canton_metadata: Partial<CantonTransaction> } | null> {
   if (cantonAvailable()) {
     try {
-      const resp = await cantonPost("/v2/state/active-contracts", {
+      let queryOffset = activeAtOffset;
+      if (!queryOffset) {
+        const endResp = await cantonGet("/v2/state/ledger-end");
+        if (endResp.ok) {
+          const endData = await endResp.json() as { offset?: string };
+          queryOffset = endData.offset;
+        }
+      }
+
+      const acsBody: Record<string, unknown> = {
         filter: {
           filtersByParty: {
             [CANTON_SUBMITTER]: {
@@ -289,14 +317,17 @@ export async function lookupCantonCommitment(
           },
         },
         verbose: false,
-      });
+      };
+      if (queryOffset) acsBody.activeAtOffset = queryOffset;
+
+      const resp = await cantonPost("/v2/state/active-contracts", acsBody);
 
       if (resp.ok) {
         const match = await readStreamingContracts(resp, attestationHash);
 
         if (match) {
           const args = match.createArguments;
-          const anchoredAt = (args.anchoredAt as string) ?? new Date().toISOString();
+          const anchoredAt = (args.createdAt as string) ?? new Date().toISOString();
           const anchor: AnchorRecord = {
             commitment_id:    match.contractId,
             tx_hash:          match.contractId,

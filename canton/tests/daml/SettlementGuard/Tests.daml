@@ -1,0 +1,28 @@
+module SettlementGuard.Tests where
+
+import Daml.Script
+import SettlementGuard.CommitmentRegistry
+
+settlementCommitmentTest : Script ()
+settlementCommitmentTest = do
+  submitter <- allocateParty "Submitter"
+  custodian <- allocateParty "Custodian"
+
+  commitmentId <- submit submitter do
+    createCmd SettlementCommitment with
+      submitter
+      custodian
+      intentId        = "test-intent-001"
+      attestationHash = "abc123"
+      bundleRootHash  = "def456"
+      assetType       = "tokenized_treasury"
+      schemaVersion   = "sg-v1"
+      createdAt       = datetime 2026 Jan 1 0 0 0
+
+  anchoredId <- submit custodian do
+    exerciseCmd commitmentId AnchorCommitment
+
+  hash <- submit submitter do
+    exerciseCmd anchoredId VerifyHash
+
+  assert (hash == "abc123")

@@ -32,7 +32,7 @@ allocate_party() {
 upload_dar() {
   echo "==> Uploading DAR: $DAR_FILE"
   if [ ! -f "$DAR_FILE" ]; then
-    echo "ERROR: DAR not found at $DAR_FILE. Run 'dpm build' inside canton/ first."
+    echo "ERROR: DAR not found at $DAR_FILE. Run 'dpm build' inside canton/ first (or 'dpm build --all' to also build tests)."
     exit 1
   fi
 
@@ -44,13 +44,8 @@ upload_dar() {
 }
 
 get_package_id() {
-  curl -sf "$LEDGER_API/v2/packages" \
-    | python3 -c "
-import sys, json
-pkgs = json.load(sys.stdin).get('packageIds', [])
-for p in pkgs:
-  print(p)
-" | head -1
+  dpm damlc inspect-dar --json "$DAR_FILE" \
+    | python3 -c "import sys, json; print(json.load(sys.stdin)['main_package_id'])"
 }
 
 wait_healthy

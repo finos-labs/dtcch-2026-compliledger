@@ -26,7 +26,7 @@ function getAnchorDb(): Database.Database {
         attestation_hash TEXT PRIMARY KEY,
         bundle_root_hash TEXT NOT NULL,
         commitment_id TEXT NOT NULL,
-        tx_hash TEXT NOT NULL,
+        tx_hash TEXT,
         intent_id TEXT NOT NULL,
         asset_type TEXT NOT NULL,
         anchored_at TEXT NOT NULL,
@@ -95,20 +95,30 @@ export async function anchorToDynamo(
     network,
   };
 
+  const controller = new AbortController();
+  const dynTimeout = setTimeout(() => controller.abort(), 8000);
   try {
     await docClient.send(
       new PutCommand({
         TableName: TABLE_NAME,
         Item: item,
         ConditionExpression: "attribute_not_exists(attestation_hash)",
-      })
+      }),
+      { abortSignal: controller.signal }
     );
   } catch (err: unknown) {
-    console.warn("DynamoDB write failed, using SQLite fallback:", (err as Error).message);
+    const msg = (err as Error).message ?? String(err);
+    console.warn("DynamoDB write failed, using SQLite fallback:", msg);
     return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
+  } finally {
+    clearTimeout(dynTimeout);
   }
 
-  anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
+  try {
+    anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
+  } catch (sqlErr) {
+    console.warn("SQLite mirror write failed (non-fatal):", (sqlErr as Error).message);
+  }
 
   return {
     commitment_id: commitmentId,
