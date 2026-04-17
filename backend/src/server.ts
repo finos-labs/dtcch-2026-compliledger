@@ -377,13 +377,15 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    setAnchorStatus(record.id, "failed");
-    writeRegulatoryEvent("ANCHOR_FAILED", correlationId, "FAILURE", { intentId: record.id, error: message }, {});
+    try { setAnchorStatus(record.id, "failed"); } catch { /* best-effort */ }
+    try { writeRegulatoryEvent("ANCHOR_FAILED", correlationId, "FAILURE", { intentId: record.id, error: message }, {}); } catch { /* best-effort */ }
     logger.error({ intentId: record.id, err: message }, "Anchor failed");
-    if (message.includes("ConditionalCheckFailedException")) {
-      res.status(409).json({ error: "Already anchored on-chain" });
-    } else {
-      res.status(500).json({ error: "Anchoring failed", details: message });
+    if (!res.headersSent) {
+      if (message.includes("ConditionalCheckFailedException")) {
+        res.status(409).json({ error: "Already anchored on-chain" });
+      } else {
+        res.status(500).json({ error: "Anchoring failed", details: message });
+      }
     }
   }
 });

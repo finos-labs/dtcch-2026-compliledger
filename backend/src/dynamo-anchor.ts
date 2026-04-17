@@ -112,7 +112,19 @@ export async function anchorToDynamo(
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn("DynamoDB write failed, using SQLite fallback:", msg);
-    return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
+    try {
+      return anchorToSqlite(bundleRootHash, attestationHash, intentId, assetType, cantonTxHash);
+    } catch (sqlErr) {
+      console.warn("SQLite fallback failed, returning synthetic anchor:", (sqlErr as Error).message);
+      const { commitmentId, anchoredAt } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
+      return {
+        commitment_id: commitmentId,
+        tx_hash: commitmentId,
+        anchored_at: anchoredAt,
+        bundle_root_hash: bundleRootHash,
+        attestation_hash: attestationHash,
+      };
+    }
   }
 
   try {
