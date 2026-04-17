@@ -37,16 +37,11 @@ export const icmaRepoRule: Rule = {
     const requiredCollateral = repurchasePrice * (1 + haircut);
 
     if (collateralValue < requiredCollateral) {
-      const deficit = requiredCollateral - collateralValue;
-      const deficitPct = (deficit / requiredCollateral) * 100;
-      return {
-        status: "FAIL" as const,
-        reason_code: `COLLATERAL_DEFICIT_${Math.round(deficitPct)}PCT`,
-      };
+      return { status: "FAIL" as const, reason_code: "COLLATERAL_DEFICIT" };
     }
 
-    if (repricingThreshold > 0) {
-      const marketValue = Number(input.current_exposure ?? collateralValue);
+    if (repricingThreshold > 0 && input.current_exposure !== undefined) {
+      const marketValue = Number(input.current_exposure);
       const deviation = Math.abs(marketValue - repurchasePrice) / repurchasePrice;
       if (deviation > repricingThreshold) {
         return { status: "CONDITIONAL" as const, reason_code: "REPRICING_REQUIRED" };

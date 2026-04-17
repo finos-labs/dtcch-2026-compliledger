@@ -53,8 +53,8 @@ export class CircuitBreaker {
       return result;
     } catch (err) {
       this.onFailure(err as Error);
-      if (fallback && this.isOpen()) {
-        logger.warn({ circuit: this.name }, "Circuit just opened — using fallback");
+      if (fallback) {
+        logger.warn({ circuit: this.name, open: this.isOpen() }, "Primary call failed — using fallback");
         return fallback();
       }
       throw err;

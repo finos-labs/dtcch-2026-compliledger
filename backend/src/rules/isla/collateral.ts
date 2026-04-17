@@ -65,7 +65,13 @@ function checkConcentration(
 export const islaCollateralRule: Rule = {
   id: "ISLA_COLLATERAL_COVERAGE",
   evaluate(input: ISLAInput) {
-    const loanValue = Number(input.loan_value ?? 0);
+    if (input.loan_value === undefined || input.loan_value === null) {
+      return { status: "FAIL" as const, reason_code: "INSUFFICIENT_COLLATERAL" };
+    }
+    const loanValue = Number(input.loan_value);
+    if (isNaN(loanValue)) {
+      return { status: "FAIL" as const, reason_code: "INSUFFICIENT_COLLATERAL" };
+    }
     const marginRatio = Number(input.margin_ratio ?? 1.05);
     const requiredCoverage = loanValue * marginRatio;
 
@@ -74,10 +80,7 @@ export const islaCollateralRule: Rule = {
       const adjustedValue = haircutAdjustedValue(items);
 
       if (adjustedValue < requiredCoverage) {
-        return {
-          status: "FAIL" as const,
-          reason_code: `INSUFFICIENT_COLLATERAL_COVERAGE_${Math.round((adjustedValue / requiredCoverage) * 100)}PCT`,
-        };
+        return { status: "FAIL" as const, reason_code: "INSUFFICIENT_COLLATERAL" };
       }
 
       if (Array.isArray(input.concentration_limits) && input.concentration_limits.length > 0) {
