@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const BACKEND_URL = process.env.BACKEND_API_URL || "http://3.133.118.100:3001";
+const BACKEND_URL = process.env.BACKEND_API_URL || "http://settlementguard-alb-1419322607.us-east-2.elb.amazonaws.com";
 
 const nextConfig: NextConfig = {
   // Disable source maps in production to protect code

@@ -73,7 +73,9 @@ export default function AppPage(): ReactNode {
   const [cantonStatus, setCantonStatus] = useState<CantonNetworkStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [anchorError, setAnchorError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCantonStatus().then(setCantonStatus).catch(() => {});
@@ -84,17 +86,27 @@ export default function AppPage(): ReactNode {
     setActivePreset(presetId);
     setAnchorData(null);
     setReasoning(null);
+    setError(null);
+    setAnchorError(null);
     try {
       const r = await runPreset(presetId);
       setResult(r);
       if (r.decision.decision === "ALLOW" && r.attestation) {
-        const anchor = await anchorAttestation(r.id);
-        setAnchorData(anchor);
-        const ai = await fetchReasoning(r.id);
-        setReasoning(ai);
+        try {
+          const anchor = await anchorAttestation(r.id);
+          setAnchorData(anchor);
+        } catch (anchorErr) {
+          setAnchorError(anchorErr instanceof Error ? anchorErr.message : "Anchoring failed");
+        }
+        try {
+          const ai = await fetchReasoning(r.id);
+          setReasoning(ai);
+        } catch {
+          // Bedrock unavailable — reasoning is optional
+        }
       }
     } catch (err) {
-      console.error("Execution failed:", err);
+      setError(err instanceof Error ? err.message : "Request failed — check your connection or auth token.");
     } finally {
       setLoading(false);
     }
@@ -185,8 +197,30 @@ export default function AppPage(): ReactNode {
           )}
         </div>
 
+        {/* Error Banner */}
+        {error && (
+          <div className={`my-3 flex items-start gap-3 rounded-xl border px-4 py-3 ${
+            dark
+              ? "border-red-500/30 bg-red-500/10 text-red-400"
+              : "border-red-300 bg-red-50 text-red-700"
+          }`}>
+            <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold">Request failed</p>
+              <p className={`mt-0.5 text-[11px] ${dark ? "text-red-400/80" : "text-red-600"}`}>{error}</p>
+            </div>
+            <button onClick={() => setError(null)} className="shrink-0 opacity-60 hover:opacity-100">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Scenario Cards — Empty State */}
-        {!result && !loading && (
+        {!result && !loading && !error && (
           <div className="grid gap-4 sm:grid-cols-2">
             {SCENARIOS.map((s) => {
               const isAllow = s.short === "ALLOW";
@@ -373,7 +407,19 @@ export default function AppPage(): ReactNode {
                       </a>
                     )}
                   </div>
-                  {anchor ? (
+                  {anchorError ? (
+                    <div className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 ${
+                      dark ? "border-red-500/30 bg-red-500/10" : "border-red-200 bg-red-50"
+                    }`}>
+                      <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H2.645c-1.73 0-2.813-1.874-1.948-3.374L10.051 3.378c.866-1.5 3.032-1.5 3.898 0l7.354 12.748z" />
+                      </svg>
+                      <div>
+                        <p className={`text-[11px] font-semibold ${dark ? "text-red-400" : "text-red-700"}`}>Anchor unavailable</p>
+                        <p className={`mt-0.5 text-[10px] leading-relaxed ${dark ? "text-red-400/70" : "text-red-600"}`}>{anchorError}</p>
+                      </div>
+                    </div>
+                  ) : anchor ? (
                     <div className="space-y-2.5">
                       <div className={`rounded-lg border p-3 ${stepBg}`}>
                         <div className="mb-2 flex items-center gap-2">

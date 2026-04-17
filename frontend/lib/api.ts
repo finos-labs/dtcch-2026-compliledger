@@ -1,5 +1,12 @@
 const API_BASE = "/api";
 
+const AUTH_TOKEN = process.env.NEXT_PUBLIC_API_BEARER_TOKEN;
+
+function authHeaders(): Record<string, string> {
+  if (!AUTH_TOKEN) return {};
+  return { Authorization: `Bearer ${AUTH_TOKEN}` };
+}
+
 export interface ProofStep {
   step_name: string;
   step_index: number;
@@ -120,7 +127,7 @@ export interface VerifyResponse {
 export async function runPreset(presetId: string): Promise<EnforcementResult> {
   const res = await fetch(`${API_BASE}/v1/intents/preset/${presetId}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
   });
   if (!res.ok) {
     throw new Error(`Failed to run preset: ${res.statusText}`);
@@ -131,7 +138,7 @@ export async function runPreset(presetId: string): Promise<EnforcementResult> {
 export async function anchorAttestation(intentId: string): Promise<CantonAnchorResponse> {
   const res = await fetch(`${API_BASE}/v1/attestations/${intentId}/anchor`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -155,7 +162,7 @@ export async function verifyAttestation(
 ): Promise<VerifyResponse> {
   const res = await fetch(`${API_BASE}/v1/verify`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
       attestation_json: attestationJson,
       signature,
@@ -192,7 +199,7 @@ export async function getIntent(intentId: string): Promise<EnforcementResult> {
 export async function fetchReasoning(intentId: string): Promise<ComplianceReasoning> {
   const res = await fetch(`${API_BASE}/v1/reasoning/${intentId}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
   });
   if (!res.ok) {
     throw new Error(`Reasoning failed: ${res.statusText}`);
@@ -214,7 +221,7 @@ export async function evaluateRulePack(
 ): Promise<RulePackEvalResult> {
   const res = await fetch(`${API_BASE}/v1/demo/evaluate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ rule_pack: rulePack, payload }),
   });
   if (!res.ok) {

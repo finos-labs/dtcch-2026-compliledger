@@ -18,9 +18,9 @@ const footerCards = [
   {
     title: "Resources",
     links: [
-      { text: "Documentation", href: "#", external: true },
-      { text: "Architecture Overview", href: "#" },
-      { text: "API Reference", href: "#", external: true },
+      { text: "Documentation", href: "https://github.com/finos-labs/dtcch-2026-compliledger#readme", external: true },
+      { text: "Architecture Overview", href: "https://github.com/finos-labs/dtcch-2026-compliledger#architecture", external: true },
+      { text: "API Reference", href: "https://github.com/finos-labs/dtcch-2026-compliledger#api", external: true },
     ],
   },
   {
@@ -150,7 +150,7 @@ export function SGFooter(): ReactNode {
                           className="inline-flex items-center gap-1 text-sm font-light text-muted-foreground transition-colors hover:text-foreground sm:text-base"
                         >
                           {link.text}
-                          {link.external && (
+                          {"external" in link && link.external && (
                             <ArrowUpRight className="h-3 w-3" />
                           )}
                         </Link>

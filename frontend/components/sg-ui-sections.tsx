@@ -9,6 +9,7 @@ const cards = [
     number: 1,
     title: "Submit Settlement Intent",
     link: "View scenarios",
+    href: "/app",
     items: [
       "Choose asset class & scenario",
       "Define settlement parameters",
@@ -20,6 +21,7 @@ const cards = [
     number: 2,
     title: "Enforce Compliance",
     link: "Explore proof chain",
+    href: "/app",
     items: [
       "Issuer Legitimacy check",
       "Asset Classification engine",
@@ -32,6 +34,7 @@ const cards = [
     number: 3,
     title: "Verify & Anchor",
     link: "Verification docs",
+    href: "https://github.com/finos-labs/dtcch-2026-compliledger#readme",
     items: [
       "On-chain proof anchoring",
       "Independent attestation verification",
@@ -113,7 +116,7 @@ export function SGUISections(): ReactNode {
                   </h3>
 
                   <a
-                    href="#"
+                    href={card.href}
                     className={`inline-flex items-center gap-2 text-sm font-medium transition-colors duration-300 group/link ${
                       hoveredCard === card.number
                         ? "text-accent"
@@ -152,7 +155,7 @@ export function SGUISections(): ReactNode {
           className="text-center"
         >
           <a
-            href="#"
+            href="/app"
             className="group inline-flex items-center gap-2 text-muted-foreground transition-colors duration-200 hover:text-foreground"
           >
             <span className="text-sm sm:text-base">
