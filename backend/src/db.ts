@@ -45,6 +45,19 @@ function initSchema(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_intents_attestation_hash
       ON intents(attestation_hash);
   `);
+
+  // Additive migrations — safe to run on every startup.
+  // ALTER TABLE is a no-op if the column already exists (caught and ignored).
+  const migrations = [
+    `ALTER TABLE intents ADD COLUMN anchor_status TEXT DEFAULT 'none'`,
+  ];
+  for (const sql of migrations) {
+    try {
+      database.exec(sql);
+    } catch {
+      // Column already present — migration not needed.
+    }
+  }
 }
 
 export function saveIntent(record: IntentRecord): void {

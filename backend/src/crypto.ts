@@ -5,7 +5,7 @@ import { signWithKMS, getKMSPublicKey, isKMSEnabled, getKMSKeyMetadata } from ".
 
 let keyPair: nacl.SignKeyPair | null = null;
 
-const DEFAULT_KEY_ID = "sg-demo-key-01";
+const DEFAULT_KEY_ID = "sg-prod-key-01";
 const DEFAULT_KEY_VERSION = "v1";
 
 function getKeyPair(): nacl.SignKeyPair {
