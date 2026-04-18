@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
@@ -44,6 +45,10 @@ function buildAnchorFields(_bundleRootHash: string, _attestationHash: string, _i
   return { commitmentId, anchoredAt };
 }
 
+function syntheticTxHash(commitmentId: string, attestationHash: string): string {
+  return createHash("sha256").update(`${commitmentId}:${attestationHash}`).digest("hex");
+}
+
 function anchorToSqlite(
   bundleRootHash: string,
   attestationHash: string,
@@ -59,7 +64,7 @@ function anchorToSqlite(
     INSERT OR IGNORE INTO anchors (attestation_hash, bundle_root_hash, commitment_id, tx_hash, intent_id, asset_type, anchored_at, network)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(attestationHash, bundleRootHash, commitmentId, txHash, intentId, assetType, anchoredAt, network);
-  return { commitment_id: commitmentId, tx_hash: txHash ?? commitmentId, anchored_at: anchoredAt, bundle_root_hash: bundleRootHash, attestation_hash: attestationHash };
+  return { commitment_id: commitmentId, tx_hash: txHash ?? syntheticTxHash(commitmentId, attestationHash), anchored_at: anchoredAt, bundle_root_hash: bundleRootHash, attestation_hash: attestationHash };
 }
 
 function lookupSqliteByAttestation(attestationHash: string): AnchorRecord | null {
@@ -119,7 +124,7 @@ export async function anchorToDynamo(
       const { commitmentId, anchoredAt } = buildAnchorFields(bundleRootHash, attestationHash, intentId);
       return {
         commitment_id: commitmentId,
-        tx_hash: commitmentId,
+        tx_hash: syntheticTxHash(commitmentId, attestationHash),
         anchored_at: anchoredAt,
         bundle_root_hash: bundleRootHash,
         attestation_hash: attestationHash,
@@ -135,7 +140,7 @@ export async function anchorToDynamo(
 
   return {
     commitment_id: commitmentId,
-    tx_hash: cantonTxHash ?? commitmentId,
+    tx_hash: cantonTxHash ?? syntheticTxHash(commitmentId, attestationHash),
     anchored_at: anchoredAt,
     bundle_root_hash: bundleRootHash,
     attestation_hash: attestationHash,
