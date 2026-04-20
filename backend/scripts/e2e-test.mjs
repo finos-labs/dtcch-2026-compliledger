@@ -823,7 +823,26 @@ async function main() {
     eq(status, 404, "HTTP status");
   });
 
-  skip("Known intent ID → AI reasoning response", "requires live AWS Bedrock credentials");
+  await test("Known intent ID → AI reasoning response", async () => {
+    const { body: intentBody } = await POST("/v1/intents", {
+      asset_type: "stablecoin",
+      issuer_name: "Bedrock Test Corp",
+      issuer_status: "active",
+      asset_id: `BDR-${Date.now()}`,
+      classification: "stablecoin",
+      custody_provider: "Segregated Reserve Trust",
+      custody_valid: true,
+      reserve_ratio: 1.05,
+    });
+    const intentId = intentBody.id;
+    assert(intentId, "intent created for reasoning test");
+    const { status, body } = await POST(`/v1/reasoning/${intentId}`, {});
+    eq(status, 200, "reasoning HTTP 200");
+    assert(typeof body.summary === "string" && body.summary.length > 0, "summary present");
+    assert(Array.isArray(body.step_explanations) && body.step_explanations.length === 4, "4 step explanations");
+    assert(typeof body.risk_assessment === "string" && body.risk_assessment.length > 0, "risk_assessment present");
+    assert(typeof body.recommendation === "string" && body.recommendation.length > 0, "recommendation present");
+  });
 
   // ── 12. End-to-End Flow ───────────────────────────────────────────────────────
   section("Full E2E Flow: submit → retrieve → verify → anchor attempt");
