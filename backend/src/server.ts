@@ -15,7 +15,7 @@ import { RuleRegistry, ruleRegistry } from "./engine/ruleRegistry";
 import { validateISDAPayload } from "./rules/isda/schema";
 import { validateISLAPayload } from "./rules/isla/schema";
 import { validateICMAPayload } from "./rules/icma/schema";
-import type { SchemaValidationResult } from "./rules/isda/schema";
+import type { SchemaValidationResult } from "./rules/schema-utils";
 import { evaluateRules, evaluateSettlementDecision } from "./engine/decisionProvider";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";

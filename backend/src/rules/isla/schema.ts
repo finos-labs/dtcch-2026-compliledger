@@ -7,18 +7,9 @@
  * or INELIGIBLE_COLLATERAL FAIL.
  */
 
-export interface SchemaValidationResult {
-  ok: boolean;
-  errors: string[];
-}
+import { isFiniteNumber, isPlainObject, type SchemaValidationResult } from "../schema-utils";
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): boolean {
-  return typeof value === "number" && Number.isFinite(value);
-}
+export type { SchemaValidationResult };
 
 export function validateISLAPayload(payload: unknown): SchemaValidationResult {
   const errors: string[] = [];
