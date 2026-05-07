@@ -7,6 +7,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/canton-status-test.mjs",
     "test:e2e": "node scripts/e2e-test.mjs",
     "canton:readiness": "node scripts/canton-readiness.mjs",
     "canton:anchor-smoke": "node scripts/canton-anchor-smoke.mjs",
