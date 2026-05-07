@@ -394,7 +394,12 @@ export async function getCantonNetworkStatus(): Promise<Record<string, unknown>>
   const submitterPartyConfigured  = Boolean(CANTON_SUBMITTER);
   const custodianPartyConfigured  = Boolean(CANTON_CUSTODIAN);
   const packageIdConfigured       = Boolean(CANTON_PACKAGE_ID);
-  const authTokenConfigured       = Boolean(CANTON_JWT_PRIVATE_KEY || CANTON_JWT_SECRET);
+  // Auth can be supplied as an RS256 signing key, an HS256 secret, or a
+  // pre-issued bearer token (CANTON_AUTH_TOKEN — documented in
+  // backend/.env.example for DevNet auth providers that mint tokens externally).
+  const authTokenConfigured       = Boolean(
+    CANTON_JWT_PRIVATE_KEY || CANTON_JWT_SECRET || process.env.CANTON_AUTH_TOKEN
+  );
 
   // "configured" means we have everything needed to submit to a Canton ledger:
   // a URL, both parties, and the Daml package id. Auth is optional for some
@@ -409,10 +414,9 @@ export async function getCantonNetworkStatus(): Promise<Record<string, unknown>>
   // Network identity for status reporting. CANTON_NETWORK / CANTON_NETWORK_LABEL
   // are the new public-facing knobs. We fall back to the legacy
   // CANTON_NETWORK_PROFILE so existing deployments keep working.
-  const networkRaw =
+  const network =
     (process.env.CANTON_NETWORK || process.env.CANTON_NETWORK_PROFILE || "localnet")
       .toLowerCase();
-  const network = networkRaw || "localnet";
   const networkLabel =
     process.env.CANTON_NETWORK_LABEL ||
     (network === "devnet"   ? "DevNet"   :
