@@ -262,14 +262,16 @@ graph TD
 
 SettlementGuard rule packs align with established market and regulatory standards. These standards define **market conditions**, not execution behavior — SettlementGuard encodes them as deterministic evaluation logic so the same condition is interpreted consistently across participants.
 
-| Standard / Framework | Example Validation Scope | Reference Rule Pack |
-|---|---|---|
-| **GENIUS / CLARITY** | Reserve sufficiency, issuer conditions, asset classification | `STABLECOIN_RESERVE_BACKING` |
-| **ISDA** | Margin sufficiency, counterparty validation | `ISDA_MARGIN_SUFFICIENCY` |
-| **ISLA** | Collateral eligibility and coverage | `ISLA_COLLATERAL_COVERAGE` |
-| **ICMA** | Repo collateral, haircut, maturity validation | `ICMA_REPO_COLLATERAL_SUFFICIENCY` |
+| Standard / Framework | Example Validation Scope | Reference Rule Pack | OSS Demo Status |
+|---|---|---|---|
+| **ISDA** | Margin sufficiency, counterparty validation | `ISDA_MARGIN_SUFFICIENCY` | Implemented in OSS demo (`rule_pack: "ISDA"`) |
+| **ISLA** | Collateral eligibility and coverage | `ISLA_COLLATERAL_COVERAGE` | Implemented in OSS demo (`rule_pack: "ISLA"`) |
+| **ICMA** | Repo collateral, haircut, maturity validation | `ICMA_REPO_COLLATERAL_SUFFICIENCY` | Implemented in OSS demo (`rule_pack: "ICMA"`) |
+| **GENIUS / CLARITY** | Reserve sufficiency, issuer conditions, asset classification | *(canonical proof-chain / policy-layer framing)* | Not available in `POST /v1/demo/evaluate` — represented in the canonical proof-chain reason-code framing and roadmap, not as an OSS demo rule pack |
 
 > These are **reference snippets only** — they demonstrate how standards-aligned validation can be encoded deterministically, not full legal or production-grade rule packs. Advanced rule orchestration, commercial logic, and full standards compliance remain out of scope for the open-source layer.
+>
+> The current OSS demo rule packs exposed via `POST /v1/demo/evaluate` are **ISDA**, **ISLA**, and **ICMA**. **GENIUS** and **CLARITY** are referenced as policy-layer framing for the canonical proof chain and roadmap; they are not implemented as standalone OSS demo rule packs in this repository.
 
 ---
 
