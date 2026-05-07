@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: SettlementGuard / CompliLedger Backend API
+  title: CompliLedger — SettlementGuard Backend API
   version: 0.1.0
   description: |
     Initial API documentation for the SettlementGuard / CompliLedger backend.
