@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: CompliLedger — SettlementGuard Backend API
+  version: 0.1.0
+  description: |
+    Initial API documentation for the SettlementGuard / CompliLedger backend.
+
+    This is a lightweight OpenAPI placeholder describing the current major
+    HTTP endpoints. Schemas are intentionally minimal and will be expanded
+    in a future iteration. See `README.md` for the authoritative endpoint
+    descriptions and end-to-end flow.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: health
+  - name: intents
+  - name: verification
+  - name: attestations
+  - name: reasoning
+  - name: keys
+  - name: canton
+  - name: demo
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Backend health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/intents:
+    post:
+      tags: [intents]
+      summary: Submit a settlement intent for proof evaluation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Intent evaluated and signed attestation returned
+          content:
+            application/json:
+              schema:
+                type: object
+    get:
+      tags: [intents]
+      summary: List persisted intent records
+      responses:
+        '200':
+          description: Array of intent records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /v1/intents/{id}:
+    get:
+      tags: [intents]
+      summary: Fetch a specific intent record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Intent record
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Intent not found
+
+  /v1/verify:
+    post:
+      tags: [verification]
+      summary: Verify attestation signature and optional on-chain presence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/attestations/{id}/anchor:
+    post:
+      tags: [attestations]
+      summary: Anchor an attestation commitment to Canton
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Canton transaction and contract identifiers
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/reasoning/{id}:
+    post:
+      tags: [reasoning]
+      summary: Generate Bedrock-backed compliance reasoning for an intent
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reasoning output
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/public-key:
+    get:
+      tags: [keys]
+      summary: Fetch the active public verification key and metadata
+      responses:
+        '200':
+          description: Public key and metadata
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/canton/status:
+    get:
+      tags: [canton]
+      summary: Canton network / configuration status
+      responses:
+        '200':
+          description: Canton status
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/canton/commitments/{attestationHash}:
+    get:
+      tags: [canton]
+      summary: Lookup a Canton commitment by attestation hash
+      parameters:
+        - in: path
+          name: attestationHash
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Commitment record
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Commitment not found
+
+  /v1/demo/evaluate:
+    post:
+      tags: [demo]
+      summary: Evaluate an OSS rule pack independently of the proof chain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Evaluation result
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas: {}
