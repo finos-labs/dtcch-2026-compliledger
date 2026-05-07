@@ -37,10 +37,17 @@ function haircutAdjustedValue(items: ISLACollateralItem[]): number {
     }, 0);
 }
 
+interface ConcentrationBreachDetails {
+  dimension: ConcentrationLimitEntry["dimension"];
+  key: string;
+  pct: number;
+  max_pct: number;
+}
+
 function checkConcentration(
   items: ISLACollateralItem[],
   limits: ConcentrationLimitEntry[]
-): string | null {
+): ConcentrationBreachDetails | null {
   const totalValue = items.reduce((s, c) => s + (c.value * (c.fx_rate_to_base ?? 1)), 0);
   if (totalValue === 0) return null;
 
@@ -56,7 +63,12 @@ function checkConcentration(
 
     const pct = (groupValue / totalValue) * 100;
     if (pct > limit.max_pct) {
-      return `CONCENTRATION_BREACH_${limit.dimension.toUpperCase()}_${limit.key}_${Math.round(pct)}PCT`;
+      return {
+        dimension: limit.dimension,
+        key: limit.key,
+        pct: Math.round(pct),
+        max_pct: limit.max_pct,
+      };
     }
   }
   return null;
@@ -89,7 +101,16 @@ export const islaCollateralRule: Rule = {
           input.concentration_limits as ConcentrationLimitEntry[]
         );
         if (concentrationBreach) {
-          return { status: "FAIL" as const, reason_code: concentrationBreach };
+          return {
+            status: "FAIL" as const,
+            reason_code: "CONCENTRATION_BREACH",
+            metadata: {
+              dimension: concentrationBreach.dimension,
+              key: concentrationBreach.key,
+              pct: concentrationBreach.pct,
+              max_pct: concentrationBreach.max_pct,
+            },
+          };
         }
       }
 
