@@ -503,6 +503,27 @@ SettlementGuard anchors compliance commitments to Canton using Daml contracts de
 - **Lookup** — `POST /v2/state/active-contracts` queries active commitments by attestation hash
 - **Status** — `GET /livez` and `GET /v2/state/ledger-end` for health and ledger offset
 
+### LocalNet vs DevNet
+
+SettlementGuard is Canton-ready and can anchor to any configured Canton JSON Ledger API environment. The same backend code paths work against either a local sandbox or a shared DevNet participant — only the connection settings change.
+
+| Environment | Purpose | Requirements |
+|---|---|---|
+| **LocalNet** | Local development and self-contained testing. Runs entirely on the developer's machine via `dpm sandbox` or the CN Quickstart LocalNet. | None beyond the local toolchain (JDK 17+, DPM, Docker for CN Quickstart). |
+| **DevNet** | Shared Canton Network development environment for cross-org integration. | Access to a validator / sponsoring Super Validator and network onboarding credentials (party allocations, JWT, JSON Ledger API endpoint). |
+
+> **Note:** DevNet is **not** considered live for this project unless a `SettlementCommitment` contract has been successfully created on DevNet. Until then, treat DevNet support as configured-but-unverified.
+
+See [docs/canton-devnet-readiness.md](docs/canton-devnet-readiness.md) for the DevNet readiness checklist and onboarding details.
+
+To check current readiness and run an anchor smoke test against the configured environment:
+
+```bash
+cd backend
+npm run canton:readiness
+npm run canton:anchor-smoke
+```
+
 ### Canton Environment Variables
 
 | Variable | Description |
