@@ -4,13 +4,33 @@
 
 # CompliLedger — SettlementGuard
 
-### Pre-settlement compliance attestation for tokenized settlement systems
+### Deterministic Validation &amp; Attestation for CDM-Aligned Tokenized Workflows
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge)](LICENSE)
 [![Canton](https://img.shields.io/badge/Ledger-Canton%20Network-6C4EE5?style=for-the-badge)](https://canton.network)
+[![CDM](https://img.shields.io/badge/FINOS-Common%20Domain%20Model-0A2540?style=for-the-badge)](https://github.com/finos/common-domain-model)
 [![FINOS](https://img.shields.io/badge/FINOS-Innovate.DTCC%202026-003366?style=for-the-badge)](https://github.com/finos-labs)
 
 </div>
+
+---
+
+> **Regulation is shifting from static reporting to real-time, verifiable compliance.**
+>
+> SettlementGuard introduces a **deterministic validation and attestation layer** for tokenized financial workflows aligned with **CDM lifecycle events**, **ISDA / ISLA / ICMA** market standards, and emerging **digital asset policy frameworks**.
+
+> 🔗 SettlementGuard is actively being explored as a **CDM-aligned validation and attestation pattern** within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
+
+---
+
+## What SettlementGuard Is — and Is Not
+
+| | SettlementGuard **is not** | | SettlementGuard **is** |
+|---|---|---|---|
+| ✕ | An execution system | ✓ | A deterministic validation and attestation layer |
+| ✕ | A broker-dealer | ✓ | Aligned to CDM lifecycle events |
+| ✕ | A workflow controller | ✓ | A producer of cryptographically verifiable evidence |
+| ✕ | A transaction engine | ✓ | External to workflow execution |
 
 ---
 
@@ -104,17 +124,66 @@ SettlementGuard is **not** part of the execution path.
 
 ---
 
-## Alignment with Industry Standards
+## The Gap
 
-SettlementGuard rule packs align with established market standards. These standards define market conditions, not execution behavior.
+The **Common Domain Model (CDM)** standardizes how lifecycle events, trade states, and workflows are represented across capital markets. It provides a shared, machine-readable vocabulary for *what* a financial event is.
 
-| Standard | Rule Pack | Check |
-|---|---|---|
-| **ISDA** | `ISDA_MARGIN_SUFFICIENCY` | Counterparty status, margin sufficiency |
-| **ISLA** | `ISLA_COLLATERAL_COVERAGE` | Collateral eligibility, coverage ratio |
-| **ICMA** | `ICMA_REPO_COLLATERAL_SUFFICIENCY` | Repo collateral, maturity validation |
+What CDM does **not** prescribe is *how* the regulatory and market conditions associated with those events should be **deterministically validated** — and how the resulting evidence should be **cryptographically attested**.
 
-> These are **reference snippets only** — they demonstrate how standards-aligned settlement decisioning can be encoded, not full legal or production-grade rule packs. Advanced rule orchestration, commercial logic, and full standards compliance remain out of scope for the open-source layer.
+Today:
+
+- ✅ **CDM** standardizes lifecycle events and workflows
+- ⚠️ **Validation and attestation** remain fragmented across firms and platforms
+- ⚠️ Each participant **implements validation differently**, producing inconsistent results for the same event
+- ⚠️ Evidence is often **generated after execution**, as audit reconstruction rather than as a precondition
+- ⚠️ Tokenized markets — where workflows are programmable and atomic — require **deterministic validation** and **independently verifiable evidence** *before* state progression
+
+> SettlementGuard explores how **regulatory and market conditions associated with CDM-defined events** can be evaluated **deterministically** and transformed into **cryptographically verifiable proof artifacts** *before* workflow progression.
+
+---
+
+## Why This Matters
+
+Tokenized and programmable markets fundamentally change the role of validation. When settlement is instant, atomic, and machine-coordinated, post-hoc reconciliation is no longer sufficient. Validation must be:
+
+- **Deterministic** — identical inputs must yield identical outcomes, every time, on every implementation
+- **Interoperable** — rule evaluation must be portable across participants, venues, and infrastructure
+- **Reproducible** — outcomes must be re-derivable from the same inputs at any future point in time
+- **Independently verifiable** — third parties must be able to validate evidence without re-running or trusting the issuer
+
+SettlementGuard is **complementary to CDM-defined workflows**: CDM describes *what* the lifecycle event is; SettlementGuard provides a uniform, deterministic way to evaluate the conditions surrounding that event and emit cryptographic evidence that any party — issuer, custodian, regulator, counterparty — can verify independently.
+
+---
+
+## CDM-Aligned Architecture
+
+SettlementGuard is positioned as a **modular, workflow-independent layer** that sits alongside CDM and Canton / DAML, not inside them.
+
+| Layer | Responsibility |
+|---|---|
+| **CDM** | Standardized lifecycle and workflow representation |
+| **SettlementGuard** | Deterministic validation and attestation |
+| **Canton / DAML** | Workflow coordination, synchronization, and optional anchoring |
+
+Key architectural properties:
+
+- **Modularity** — validation logic is decoupled from workflow orchestration; rule packs evolve independently of contract code
+- **Workflow independence** — SettlementGuard never authors, advances, or blocks a workflow; it observes inputs and emits evidence
+- **Deterministic evaluation behavior** — given identical CDM-aligned inputs, the engine always produces the same proof bundle and the same attestation hash
+
+```mermaid
+flowchart TD
+    CDM["CDM TradeState / BusinessEvent"]
+    VAL["SettlementGuard Validation"]
+    PROOF["Proof Bundle + Attestation"]
+    CANTON["Canton / DAML Coordination"]
+    EXT["External Systems / Workflow Progression"]
+
+    CDM --> VAL
+    VAL --> PROOF
+    PROOF --> CANTON
+    CANTON --> EXT
+```
 
 ---
 
@@ -184,6 +253,21 @@ graph TD
 | **Cryptography** | SHA-256 + Ed25519 | Bundle hashing and attestation signing |
 | **Frontend** | Next.js 15 / React / Tailwind CSS | Compliance console with real-time network status |
 | **Deployment** | AWS ECS (backend) + Vercel (frontend) | Production infrastructure |
+
+---
+
+## Alignment with Industry Standards
+
+SettlementGuard rule packs align with established market and regulatory standards. These standards define **market conditions**, not execution behavior — SettlementGuard encodes them as deterministic evaluation logic so the same condition is interpreted consistently across participants.
+
+| Standard / Framework | Example Validation Scope | Reference Rule Pack |
+|---|---|---|
+| **GENIUS / CLARITY** | Reserve sufficiency, issuer conditions, asset classification | `STABLECOIN_RESERVE_BACKING` |
+| **ISDA** | Margin sufficiency, counterparty validation | `ISDA_MARGIN_SUFFICIENCY` |
+| **ISLA** | Collateral eligibility and coverage | `ISLA_COLLATERAL_COVERAGE` |
+| **ICMA** | Repo collateral, haircut, maturity validation | `ICMA_REPO_COLLATERAL_SUFFICIENCY` |
+
+> These are **reference snippets only** — they demonstrate how standards-aligned validation can be encoded deterministically, not full legal or production-grade rule packs. Advanced rule orchestration, commercial logic, and full standards compliance remain out of scope for the open-source layer.
 
 ---
 
@@ -306,6 +390,23 @@ flowchart LR
 - **Attestation Signature** — Ed25519 over `{bundle_root_hash}:{intent_id}:{issued_at}`
 - **On-ledger Contract** — Canton `contractId` and `transaction_id` for `SettlementCommitment` / `AnchoredCommitment` records
 - **Privacy** — only hashes committed on-chain; raw settlement data never leaves the originating environment
+
+---
+
+## Deterministic Evaluation
+
+> **`same input → same output → same proof`**
+
+Determinism is the foundational property of SettlementGuard. Every rule evaluation is a pure function of its declared inputs and a versioned, machine-readable rule pack. There is no hidden state, no model inference, and no time-dependent behavior in the evaluation path.
+
+This produces four properties that matter for tokenized financial infrastructure:
+
+- **Reproducible validation** — any party, at any time, can re-run the evaluation against the same inputs and obtain the same proof bundle and the same root hash
+- **Interoperability** — because evaluation is fully specified, results are portable across implementations, vendors, and venues
+- **Reduced interpretation variance** — the same regulatory or market condition is evaluated identically across participants, eliminating per-firm interpretation drift
+- **Independent verification** — third parties can verify the cryptographic attestation without trusting, contacting, or re-executing the issuer
+
+Determinism is what makes SettlementGuard suitable as a **shared validation primitive** for CDM-aligned workflows.
 
 ---
 
@@ -612,13 +713,28 @@ graph LR
 
 ---
 
-## AI Reasoning (Optional)
+## Optional AI-Assisted Reasoning
 
-SettlementGuard can optionally generate AI-assisted explanations via `POST /v1/reasoning/:id` (AWS Bedrock, Amazon Nova Micro).
+SettlementGuard can optionally generate AI-assisted explanations via `POST /v1/reasoning/:id` (AWS Bedrock, Amazon Nova Micro). This capability exists purely to translate deterministic evaluation results into plain-language commentary for human reviewers.
 
-- AI output is **non-deterministic** and **non-decisional**
-- It does not affect evaluation results or attestation values
+- **Informational only** — AI output is commentary, never a decision
+- **Non-deterministic** — model output may vary across invocations
+- **Not part of proof generation** — AI text is excluded from the proof bundle, the bundle root hash, and the Ed25519 attestation
+- It does not affect evaluation results, attestation values, or on-chain commitments
 - Requires valid AWS credentials and Bedrock model access
+
+> The deterministic proof chain is the source of truth. AI-assisted reasoning is a presentation aid layered on top of it.
+
+---
+
+## FINOS / CDM Contribution
+
+> SettlementGuard is currently being explored as a **proposed deterministic validation and attestation pattern** aligned to CDM lifecycle events within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
+
+Discussion and design proposal:
+🔗 [finos/common-domain-model#4684](https://github.com/finos/common-domain-model/issues/4684)
+
+The intent is to contribute SettlementGuard's evaluation and attestation pattern as a reusable, standards-aligned building block that complements CDM's lifecycle and workflow representations — enabling the broader ecosystem to share a consistent approach to deterministic validation and verifiable evidence for tokenized financial infrastructure.
 
 ---
 
