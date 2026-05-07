@@ -68,11 +68,17 @@ async function main() {
   if (ledgerUrl.length > 0) {
     const base = ledgerUrl.replace(/\/$/, "");
     const headers = {};
-    const authToken = (process.env.CANTON_AUTH_TOKEN || "").trim();
-    if (authToken && !/[\r\n\t\0]/.test(authToken)) {
+    const authTokenRaw = process.env.CANTON_AUTH_TOKEN || "";
+    const authToken = authTokenRaw.trim();
+    // Reject tokens containing CR/LF or any other control characters to avoid
+    // HTTP header injection via a misconfigured env var. Mirrors the
+    // sanitizeBearerToken() guard in src/canton-ledger.ts.
+    if (authToken && !/[\x00-\x1F\x7F]/.test(authToken)) {
       headers["Authorization"] = authToken.toLowerCase().startsWith("bearer ")
         ? authToken
         : `Bearer ${authToken}`;
+    } else if (authToken) {
+      console.log(`  ${DIM("note: CANTON_AUTH_TOKEN contains control characters and was ignored")}`);
     }
 
     let probeOk = false;
