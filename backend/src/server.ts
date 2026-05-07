@@ -23,7 +23,7 @@ import { generateComplianceReasoning } from "./bedrock-reasoning";
 import { evaluate, type RulePack } from "./engine/ossRuleEvaluator";
 import type { OssEvaluation } from "./types";
 import { logger } from "./logger";
-import { guardStartup, requireAuth } from "./middleware/auth";
+import { guardStartup, requireAuth, requireScope } from "./middleware/auth";
 import type { AuthenticatedRequest } from "./middleware/auth";
 import { writeRegulatoryEvent, getRegulatoryEvents } from "./audit/regulatory-log";
 import { cantonCircuit, bedrockCircuit } from "./circuit-breaker";
@@ -72,13 +72,20 @@ app.use("/v1/verify", postRateLimiter);
 app.use("/v1/attestations", postRateLimiter);
 app.use("/v1/reasoning", postRateLimiter);
 app.use("/v1/demo/evaluate", postRateLimiter);
+app.use("/v1/audit", postRateLimiter);
 
-app.post("/v1/intents", requireAuth);
-app.post("/v1/intents/preset/:presetId", requireAuth);
-app.post("/v1/verify", requireAuth);
-app.post("/v1/attestations/:id/anchor", requireAuth);
-app.post("/v1/reasoning/:id", requireAuth);
-app.post("/v1/demo/evaluate", requireAuth);
+// Auth + route-level scopes.
+// Static API_BEARER_TOKEN clients are granted `sg:admin` (wildcard) so the
+// existing demo bearer-token flow continues to work without scope claims.
+// JWT clients must present the listed scope (or `sg:admin`).
+app.post("/v1/intents", requireAuth, requireScope("sg:intents:write"));
+app.post("/v1/intents/preset/:presetId", requireAuth, requireScope("sg:intents:write"));
+app.get("/v1/intents", requireAuth, requireScope("sg:intents:read"));
+app.get("/v1/intents/:id", requireAuth, requireScope("sg:intents:read"));
+app.post("/v1/verify", requireAuth, requireScope("sg:verify:read"));
+app.post("/v1/attestations/:id/anchor", requireAuth, requireScope("sg:attestations:write"));
+app.post("/v1/reasoning/:id", requireAuth, requireScope("sg:reasoning:read"));
+app.post("/v1/demo/evaluate", requireAuth, requireScope("sg:demo:evaluate"));
 
 /** Extract and run an optional OSS rule evaluation from a request body. */
 function resolveOssEvaluation(body: Record<string, unknown>): OssEvaluation | undefined {
@@ -436,7 +443,7 @@ app.get("/v1/public-key", async (_req, res) => {
 });
 
 // GET /v1/audit/:id — Regulatory event audit trail for a given intent
-app.get("/v1/audit/:id", requireAuth, (req, res) => {
+app.get("/v1/audit/:id", requireAuth, requireScope("sg:audit:read"), (req, res) => {
   const auditId = String(req.params.id);
   const events = getRegulatoryEvents(auditId);
   res.json({ correlation_id: auditId, events });

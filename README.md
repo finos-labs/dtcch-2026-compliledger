@@ -608,6 +608,27 @@ CANTON_PARTICIPANT=sg-participant-01
 DYNAMO_TABLE=sg-commitment-registry
 ```
 
+### Authentication & route scopes
+
+The backend supports two authentication modes (configure at least one):
+
+- **Static bearer token** (`API_BEARER_TOKEN`) — intended for local development and the demo. Clients sending `Authorization: Bearer $API_BEARER_TOKEN` are granted the `sg:admin` wildcard scope, which satisfies every per-route scope check. This preserves backward compatibility — existing demo clients require **no scope claims**.
+- **JWT** (`SG_JWT_SECRET`, `SG_JWT_ISSUER`, `SG_JWT_AUDIENCE`) — for non-demo deployments. Tokens must carry a `scope` (or `scopes`) claim with the per-route scope listed below (or `sg:admin`).
+
+Required scopes per route (enforced by `requireScope` in `backend/src/middleware/auth.ts`):
+
+| Method & path | Required scope |
+|---|---|
+| `POST /v1/intents`, `POST /v1/intents/preset/:presetId` | `sg:intents:write` |
+| `GET  /v1/intents`, `GET /v1/intents/:id` | `sg:intents:read` |
+| `POST /v1/verify` | `sg:verify:read` |
+| `POST /v1/attestations/:id/anchor` | `sg:attestations:write` (alias: `sg:anchor:write`) |
+| `POST /v1/reasoning/:id` | `sg:reasoning:read` |
+| `GET  /v1/audit/:id` | `sg:audit:read` |
+| `POST /v1/demo/evaluate` | `sg:demo:evaluate` |
+
+`sg:admin` satisfies any required scope.
+
 ### Frontend
 
 ```bash

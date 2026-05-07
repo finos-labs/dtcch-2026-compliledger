@@ -7,11 +7,27 @@ const JWT_SECRET = process.env.SG_JWT_SECRET;
 const JWT_ISSUER = process.env.SG_JWT_ISSUER;
 const JWT_AUDIENCE = process.env.SG_JWT_AUDIENCE || "settlementguard-api";
 
+/**
+ * Route-level authorization scopes.
+ *
+ * Static `API_BEARER_TOKEN` clients are granted `sg:admin`, which the
+ * `requireScope` check below treats as a wildcard — preserving backward
+ * compatibility for the demo bearer-token auth model (no scopes required).
+ *
+ * JWT clients must carry one of the listed scopes (or `sg:admin`).
+ *
+ * The `sg:anchor:write` value is retained as a backward-compatible alias
+ * for `sg:attestations:write`; either is accepted on anchor routes.
+ */
 export type AuthScope =
   | "sg:intents:write"
-  | "sg:anchor:write"
+  | "sg:intents:read"
   | "sg:verify:read"
+  | "sg:attestations:write"
+  | "sg:anchor:write"
   | "sg:reasoning:read"
+  | "sg:audit:read"
+  | "sg:demo:evaluate"
   | "sg:admin";
 
 export interface AuthenticatedRequest extends Request {
@@ -82,7 +98,15 @@ export function requireScope(scope: AuthScope) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    if (ctx.scopes.includes("sg:admin") || ctx.scopes.includes(scope)) {
+    // sg:admin is a wildcard (granted to static-bearer-token clients to
+    // preserve backward compatibility with the demo auth model).
+    // sg:anchor:write and sg:attestations:write are accepted as aliases.
+    const aliases: Record<string, string[]> = {
+      "sg:attestations:write": ["sg:anchor:write"],
+      "sg:anchor:write": ["sg:attestations:write"],
+    };
+    const accepted = new Set<string>([scope, "sg:admin", ...(aliases[scope] ?? [])]);
+    if (ctx.scopes.some((s) => accepted.has(s))) {
       next();
       return;
     }
