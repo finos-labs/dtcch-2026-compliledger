@@ -32,6 +32,24 @@ const CANTON_JWT_SECRET      = process.env.CANTON_JWT_SECRET || "";
 const CANTON_JWT_PRIVATE_KEY = process.env.CANTON_JWT_PRIVATE_KEY || "";
 const CANTON_JWT_AUDIENCE    = process.env.CANTON_JWT_AUDIENCE || "https://daml.com/ledger-api";
 const CANTON_LEDGER_USER     = process.env.CANTON_LEDGER_USER || "sg-service-account";
+// Optional pre-issued bearer token (e.g. from DevNet auth provider or a secured JSON Ledger
+// API gateway). When set, it short-circuits local JWT minting and is sent as-is in the
+// Authorization header. This lets operators integrate with deployments that issue tokens
+// out-of-band without having to provision a CANTON_JWT_PRIVATE_KEY/secret.
+const CANTON_AUTH_TOKEN      = sanitizeBearerToken(process.env.CANTON_AUTH_TOKEN);
+
+// Strip surrounding whitespace and reject tokens containing CR/LF or other control characters
+// to prevent HTTP header injection via a misconfigured env var.
+function sanitizeBearerToken(raw: string | undefined): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/[\r\n\t\0]/.test(trimmed) || /[\x00-\x1F\x7F]/.test(trimmed)) {
+    logger.warn("CANTON_AUTH_TOKEN contains control characters and was ignored");
+    return "";
+  }
+  return trimmed;
+}
 
 const TEMPLATE_ID = CANTON_PACKAGE_ID
   ? `${CANTON_PACKAGE_ID}:SettlementGuard.CommitmentRegistry:SettlementCommitment`
@@ -102,6 +120,10 @@ function buildCantonJWT(actingParty: string): string | null {
 
 function cantonHeaders(actingParty?: string): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (CANTON_AUTH_TOKEN) {
+    headers["Authorization"] = `Bearer ${CANTON_AUTH_TOKEN}`;
+    return headers;
+  }
   const token = buildCantonJWT(actingParty ?? CANTON_SUBMITTER);
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
