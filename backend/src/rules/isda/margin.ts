@@ -59,7 +59,10 @@ export const isdaMarginRule: Rule = {
     if (callAmount > mta) {
       return {
         status: "FAIL" as const,
-        reason_code: `MARGIN_CALL_REQUIRED_AMOUNT_${Math.round(callAmount)}`,
+        reason_code: "MARGIN_CALL_REQUIRED",
+        metadata: {
+          call_amount: Math.round(callAmount),
+        },
       };
     }
 
