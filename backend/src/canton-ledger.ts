@@ -408,60 +408,138 @@ export async function lookupCantonCommitment(
 }
 
 export async function getCantonNetworkStatus(): Promise<Record<string, unknown>> {
-  let status = "unavailable";
-  let ledgerEnd: string | null = null;
-  let connectedParties: string[] = [];
-  let liveProbeOk = false;
+  // Per-field configuration flags. These describe what the operator has wired
+  // up via env vars and are independent of whether the ledger is actually
+  // reachable. We never claim a Canton ledger is "connected" or "reachable"
+  // unless a live probe to the configured JSON Ledger API succeeds.
+  const ledgerApiUrlConfigured    = Boolean(process.env.CANTON_LEDGER_API_URL);
+  const submitterPartyConfigured  = Boolean(CANTON_SUBMITTER);
+  const custodianPartyConfigured  = Boolean(CANTON_CUSTODIAN);
+  const packageIdConfigured       = Boolean(CANTON_PACKAGE_ID);
+  // Auth can be supplied as an RS256 signing key, an HS256 secret, or a
+  // pre-issued bearer token (CANTON_AUTH_TOKEN — documented in
+  // backend/.env.example for DevNet auth providers that mint tokens externally).
+  const authTokenConfigured       = Boolean(
+    CANTON_JWT_PRIVATE_KEY || CANTON_JWT_SECRET || process.env.CANTON_AUTH_TOKEN
+  );
 
-  if (cantonAvailable()) {
+  // "configured" means we have everything needed to submit to a Canton ledger:
+  // a URL, both parties, and the Daml package id. Auth is optional for some
+  // dev deployments (LocalNet sandbox without auth), so it is reported as a
+  // separate flag rather than gating `configured`.
+  const configured =
+    ledgerApiUrlConfigured &&
+    submitterPartyConfigured &&
+    custodianPartyConfigured &&
+    packageIdConfigured;
+
+  // Network identity for status reporting. CANTON_NETWORK / CANTON_NETWORK_LABEL
+  // are the new public-facing knobs. We fall back to the legacy
+  // CANTON_NETWORK_PROFILE so existing deployments keep working.
+  const network =
+    (process.env.CANTON_NETWORK || process.env.CANTON_NETWORK_PROFILE || "localnet")
+      .toLowerCase();
+  const networkLabel =
+    process.env.CANTON_NETWORK_LABEL ||
+    (network === "devnet"   ? "DevNet"   :
+     network === "testnet"  ? "TestNet"  :
+     network === "mainnet"  ? "MainNet"  :
+     network === "localnet" ? "LocalNet" : network);
+
+  const mode: "localnet" | "devnet" | "unknown" =
+    network === "localnet" ? "localnet" :
+    network === "devnet"   ? "devnet"   : "unknown";
+
+  // Reachability probe. If we have no URL we cannot probe; reachable=false.
+  // Otherwise try the same lightweight endpoints the rest of the repo uses
+  // (`/livez` for liveness, `/v2/state/ledger-end` for ledger-end). All
+  // network errors are swallowed — this endpoint must never throw 500.
+  let reachable = false;
+  let ledgerEndAvailable = false;
+  let ledgerEnd: string | null = null;
+  if (ledgerApiUrlConfigured) {
     try {
       const health = await cantonGet("/livez");
       if (health.ok) {
-        status = "connected";
-        liveProbeOk = true;
-        const endResp = await cantonGet("/v2/state/ledger-end");
-        if (endResp.ok) {
-          const endData = await endResp.json() as { offset?: string };
-          ledgerEnd = endData.offset ?? null;
-        }
-        connectedParties = [CANTON_SUBMITTER, CANTON_CUSTODIAN].filter(Boolean);
+        reachable = true;
       }
     } catch {
-      status = "unreachable";
+      // unreachable — leave reachable=false
     }
-  } else {
-    status = "not_configured";
+
+    try {
+      const endResp = await cantonGet("/v2/state/ledger-end");
+      if (endResp.ok) {
+        // A successful ledger-end response also proves reachability, even
+        // when /livez is not exposed by the deployment (e.g. some validators).
+        reachable = true;
+        ledgerEndAvailable = true;
+        try {
+          const endData = await endResp.json() as { offset?: string };
+          ledgerEnd = endData.offset ?? null;
+        } catch {
+          /* ledger-end body not JSON — still counts as available */
+        }
+      }
+    } catch {
+      // unreachable for ledger-end — leave ledgerEndAvailable=false
+    }
   }
 
-  // Required env vars for any non-local profile to even be considered "configured for DevNet/TestNet/MainNet".
-  // We do not infer DevNet from defaults; the operator must explicitly set every value.
+  // Backwards-compatible `status` string used by existing frontend consumers.
+  // Only report "connected" when a real reachability check succeeded.
+  let legacyStatus: string;
+  if (!cantonAvailable()) {
+    legacyStatus = "not_configured";
+  } else if (reachable) {
+    legacyStatus = "connected";
+  } else if (ledgerApiUrlConfigured) {
+    legacyStatus = "unreachable";
+  } else {
+    legacyStatus = "unavailable";
+  }
+
+  const connectedParties = reachable
+    ? [CANTON_SUBMITTER, CANTON_CUSTODIAN].filter(Boolean)
+    : [];
+
+  // `devnet_ready` (legacy) — only true when the operator opted into devnet,
+  // every DevNet-grade env var is populated (incl. RS256 JWT signing key),
+  // AND the configured ledger actually responded.
   const requiredForRemote = {
-    CANTON_LEDGER_API_URL:    Boolean(process.env.CANTON_LEDGER_API_URL),
-    CANTON_SUBMITTER_PARTY:   Boolean(CANTON_SUBMITTER),
-    CANTON_CUSTODIAN_PARTY:   Boolean(CANTON_CUSTODIAN),
-    CANTON_PACKAGE_ID:        Boolean(CANTON_PACKAGE_ID),
+    CANTON_LEDGER_API_URL:    ledgerApiUrlConfigured,
+    CANTON_SUBMITTER_PARTY:   submitterPartyConfigured,
+    CANTON_CUSTODIAN_PARTY:   custodianPartyConfigured,
+    CANTON_PACKAGE_ID:        packageIdConfigured,
     CANTON_JWT_PRIVATE_KEY:   Boolean(CANTON_JWT_PRIVATE_KEY),
   };
   const missingForRemote = Object.entries(requiredForRemote)
     .filter(([, present]) => !present)
     .map(([name]) => name);
-
-  // `devnet_ready` is only true when:
-  //   1) operator explicitly opted in via CANTON_NETWORK_PROFILE=devnet,
-  //   2) all DevNet-grade env vars (incl. RS256 JWT signing key) are populated, AND
-  //   3) the configured ledger actually responded to /livez.
-  // This guarantees we never *claim* DevNet is live based on configuration alone.
   const devnetReady =
-    CANTON_NETWORK_PROFILE === "devnet" &&
+    (CANTON_NETWORK_PROFILE === "devnet" || mode === "devnet") &&
     missingForRemote.length === 0 &&
-    liveProbeOk;
+    reachable;
 
   return {
-    network:     "canton-global-synchronizer",
+    // New readiness fields (LocalNet / DevNet status contract).
+    configured,
+    network,
+    network_label: networkLabel,
+    ledger_api_url_configured:  ledgerApiUrlConfigured,
+    submitter_party_configured: submitterPartyConfigured,
+    custodian_party_configured: custodianPartyConfigured,
+    package_id_configured:      packageIdConfigured,
+    auth_token_configured:      authTokenConfigured,
+    reachable,
+    ledger_end_available:       ledgerEndAvailable,
+    mode,
+
+    // Backwards-compatible fields (frontend + existing tooling consumers).
     network_profile: CANTON_NETWORK_PROFILE,
     domain:      CANTON_DOMAIN,
     participant: CANTON_PARTICIPANT,
-    status,
+    status:      legacyStatus,
     ledger_api:  "json-api/v2",
     ledger_end:  ledgerEnd,
     parties:     connectedParties,

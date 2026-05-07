@@ -92,6 +92,18 @@ export interface CantonNetworkStatus {
   commitment_table: string;
   schema_version: string;
   features: Record<string, boolean>;
+  // LocalNet / DevNet readiness fields (optional for backwards compatibility
+  // with older backends that have not yet been upgraded).
+  configured?: boolean;
+  network_label?: string;
+  ledger_api_url_configured?: boolean;
+  submitter_party_configured?: boolean;
+  custodian_party_configured?: boolean;
+  package_id_configured?: boolean;
+  auth_token_configured?: boolean;
+  reachable?: boolean;
+  ledger_end_available?: boolean;
+  mode?: "localnet" | "devnet" | "unknown";
 }
 
 export interface SettlementIntent {
