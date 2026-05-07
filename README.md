@@ -416,6 +416,8 @@ Determinism is what makes SettlementGuard suitable as a **shared validation prim
 
 ## API Reference
 
+> Initial OpenAPI documentation: [`docs/openapi.yaml`](docs/openapi.yaml)
+
 | Endpoint | Method | Description |
 |---|---|---|
 | `/health` | GET | Backend health check |
