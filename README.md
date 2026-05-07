@@ -41,7 +41,7 @@ SettlementGuard is a **pre-settlement compliance attestation module** built by C
 It evaluates structured transaction inputs against deterministic, machine-readable rule sets (aligned with ISDA, ISLA, and ICMA) and produces **cryptographically verifiable proof artifacts** representing compliance-related conditions at a specific point in time.
 
 > SettlementGuard does not execute transactions, route orders, or make trading decisions.
-> It generates independent, tamper-evident attestations that external systems may use in their own decision-making processes.
+> It generates independent, tamper-evident attestations and verifiable signals that external systems independently interpret as part of their own workflow continuation.
 
 ---
 
@@ -88,9 +88,11 @@ SettlementGuard uses deterministic rule evaluation:
 | `FAIL` | One or more criteria not satisfied |
 | `CONDITIONAL` | Partial satisfaction; additional review required |
 
-These values represent **rule evaluation results only**. They do not approve transactions, deny transactions, or influence execution.
+These values represent **rule evaluation results only**. They do not approve, deny, block, or permit transactions, and they do not influence execution.
 
 In API responses, `decision_type: "evaluation"` accompanies OSS rule evaluation responses (`POST /v1/demo/evaluate`) and `decision_type: "enforcement"` accompanies proof-chain responses (`POST /v1/intents`). This separation is intentional.
+
+> **Note on the `"enforcement"` label:** `decision_type: "enforcement"` is an **internal reference implementation label** used to distinguish proof-chain responses from standalone OSS rule evaluation responses. It does **not** mean SettlementGuard authorizes, approves, denies, blocks, permits, or otherwise enforces a transaction. The response is a **proof-chain result** — a verifiable signal that external systems independently interpret. SettlementGuard performs no execution or enforcement action.
 
 ---
 
@@ -110,7 +112,7 @@ flowchart TD
         EVAL --> ATTEST --> ANCHOR
     end
 
-    EXT["External System\nDecision-Making"]
+    EXT["External System\nInterprets Attestation"]
     EXEC["Execution\nBroker-Dealer / Platform"]
     CLR["Clearing & Settlement\nDTCC / CSD"]
 
@@ -304,7 +306,7 @@ sequenceDiagram
     end
 
     rect rgb(20, 80, 45)
-        Note over U,CL: PHASE 2 — CANTON ANCHORING  (ALLOW results only)
+        Note over U,CL: PHASE 2 — CANTON ANCHORING  (only when criteria satisfied)
         U->>FE: Click Anchor Commitment
         FE->>API: POST /v1/attestations/:id/anchor
         API->>CL: POST /v2/commands/submit-and-wait
@@ -367,8 +369,8 @@ flowchart LR
 
     DEC{"All steps\nPASS?"}
 
-    ATT["Ed25519 Attestation\nIssued\ndecision = ALLOW"]
-    DENY["No Attestation\ndecision = DENY"]
+    ATT["Ed25519 Attestation\nIssued\nproof-chain result:\ncriteria satisfied"]
+    NOATT["No Attestation\nproof-chain result:\ncriteria not satisfied"]
     ANCHOR["Canton Anchor\nSettlementCommitment\nDaml Contract"]
 
     IN --> S1 --> H1
@@ -378,7 +380,7 @@ flowchart LR
     H1 & H2 & H3 & H4 --> MR
     MR --> DEC
     DEC -->|Yes| ATT
-    DEC -->|No| DENY
+    DEC -->|No| NOATT
     ATT --> ANCHOR
 ```
 
@@ -443,7 +445,7 @@ POST /v1/verify
 → validate Ed25519 signature
 → validate bundle integrity
 
-# 3. Anchor to Canton (optional, ALLOW results only)
+# 3. Anchor to Canton (optional, only when proof-chain criteria are satisfied)
 POST /v1/attestations/:id/anchor
 → submit SettlementCommitment Daml contract
 → return canton transaction_id and contract_id
@@ -517,8 +519,8 @@ stateDiagram-v2
 
     IntentSubmitted --> ProofChainRunning : Proof chain executes
     ProofChainRunning --> BundleSealed : 4 steps evaluated + hashed
-    BundleSealed --> AttestationIssued : decision = ALLOW
-    BundleSealed --> Denied : decision = DENY
+    BundleSealed --> AttestationIssued : criteria satisfied
+    BundleSealed --> Denied : criteria not satisfied
 
     AttestationIssued --> AnchorPending : POST /v1/attestations/:id/anchor
     AnchorPending --> SettlementCommitment : Canton submit-and-wait OK
