@@ -11,6 +11,23 @@ const CANTON_PACKAGE_ID   = process.env.CANTON_PACKAGE_ID || "";
 const CANTON_DOMAIN       = process.env.CANTON_DOMAIN || "global-synchronizer.canton.network";
 const CANTON_PARTICIPANT  = process.env.CANTON_PARTICIPANT || "sg-participant-01";
 const SCHEMA_VERSION      = "sg-v1";
+
+// Network profile is purely informational/configurational. It does NOT change submission
+// behavior — the same Canton JSON Ledger API client is used for every profile. The profile
+// only describes which deployment target the operator has wired into the env vars so that
+// status/readiness reports are accurate. We never claim DevNet (or any non-local profile)
+// is "live" until the configured ledger actually responds to a health probe.
+const SUPPORTED_NETWORK_PROFILES = ["localnet", "devnet", "testnet", "mainnet"] as const;
+type CantonNetworkProfile = (typeof SUPPORTED_NETWORK_PROFILES)[number];
+
+function readNetworkProfile(): CantonNetworkProfile {
+  const raw = (process.env.CANTON_NETWORK_PROFILE || "localnet").toLowerCase();
+  return (SUPPORTED_NETWORK_PROFILES as readonly string[]).includes(raw)
+    ? (raw as CantonNetworkProfile)
+    : "localnet";
+}
+
+const CANTON_NETWORK_PROFILE: CantonNetworkProfile = readNetworkProfile();
 const CANTON_JWT_SECRET      = process.env.CANTON_JWT_SECRET || "";
 const CANTON_JWT_PRIVATE_KEY = process.env.CANTON_JWT_PRIVATE_KEY || "";
 const CANTON_JWT_AUDIENCE    = process.env.CANTON_JWT_AUDIENCE || "https://daml.com/ledger-api";
@@ -46,6 +63,7 @@ export interface CantonAnchorResult {
   anchor: AnchorRecord;
   canton_transaction: CantonTransaction;
   network: string;
+  network_profile: CantonNetworkProfile;
   domain: string;
   participant: string;
   completion_offset?: string;
@@ -264,6 +282,7 @@ export async function anchorToCantonLedger(
         },
       },
       network:     "canton-global-synchronizer",
+      network_profile: CANTON_NETWORK_PROFILE,
       domain:      CANTON_DOMAIN,
       participant: CANTON_PARTICIPANT,
       completion_offset: completionOffset,
@@ -290,7 +309,7 @@ export async function anchorToCantonLedger(
       anchored_at:      anchor.anchored_at,
     },
   };
-  return { anchor, canton_transaction: cantonTx, network: "dynamo-fallback", domain: CANTON_DOMAIN, participant: CANTON_PARTICIPANT };
+  return { anchor, canton_transaction: cantonTx, network: "dynamo-fallback", network_profile: CANTON_NETWORK_PROFILE, domain: CANTON_DOMAIN, participant: CANTON_PARTICIPANT };
 }
 
 export async function lookupCantonCommitment(
@@ -370,12 +389,14 @@ export async function getCantonNetworkStatus(): Promise<Record<string, unknown>>
   let status = "unavailable";
   let ledgerEnd: string | null = null;
   let connectedParties: string[] = [];
+  let liveProbeOk = false;
 
   if (cantonAvailable()) {
     try {
       const health = await cantonGet("/livez");
       if (health.ok) {
         status = "connected";
+        liveProbeOk = true;
         const endResp = await cantonGet("/v2/state/ledger-end");
         if (endResp.ok) {
           const endData = await endResp.json() as { offset?: string };
@@ -390,8 +411,32 @@ export async function getCantonNetworkStatus(): Promise<Record<string, unknown>>
     status = "not_configured";
   }
 
+  // Required env vars for any non-local profile to even be considered "configured for DevNet/TestNet/MainNet".
+  // We do not infer DevNet from defaults; the operator must explicitly set every value.
+  const requiredForRemote = {
+    CANTON_LEDGER_API_URL:    Boolean(process.env.CANTON_LEDGER_API_URL),
+    CANTON_SUBMITTER_PARTY:   Boolean(CANTON_SUBMITTER),
+    CANTON_CUSTODIAN_PARTY:   Boolean(CANTON_CUSTODIAN),
+    CANTON_PACKAGE_ID:        Boolean(CANTON_PACKAGE_ID),
+    CANTON_JWT_PRIVATE_KEY:   Boolean(CANTON_JWT_PRIVATE_KEY),
+  };
+  const missingForRemote = Object.entries(requiredForRemote)
+    .filter(([, present]) => !present)
+    .map(([name]) => name);
+
+  // `devnet_ready` is only true when:
+  //   1) operator explicitly opted in via CANTON_NETWORK_PROFILE=devnet,
+  //   2) all DevNet-grade env vars (incl. RS256 JWT signing key) are populated, AND
+  //   3) the configured ledger actually responded to /livez.
+  // This guarantees we never *claim* DevNet is live based on configuration alone.
+  const devnetReady =
+    CANTON_NETWORK_PROFILE === "devnet" &&
+    missingForRemote.length === 0 &&
+    liveProbeOk;
+
   return {
     network:     "canton-global-synchronizer",
+    network_profile: CANTON_NETWORK_PROFILE,
     domain:      CANTON_DOMAIN,
     participant: CANTON_PARTICIPANT,
     status,
@@ -401,5 +446,7 @@ export async function getCantonNetworkStatus(): Promise<Record<string, unknown>>
     package_id:  CANTON_PACKAGE_ID || null,
     commitment_table: process.env.DYNAMO_TABLE || "sg-commitment-registry",
     schema_version: SCHEMA_VERSION,
+    devnet_ready: devnetReady,
+    missing_remote_env: missingForRemote,
   };
 }

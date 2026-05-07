@@ -361,6 +361,7 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
         anchor,
         canton_transaction: { transaction_id: anchor.tx_hash, contract_id: "", domain_id: "", participant_id: "", command_id: "", workflow_id: "", ledger_effective_time: anchor.anchored_at, record_time: anchor.anchored_at, template_id: "", payload: {} as import("./canton-ledger").CantonCommitmentPayload },
         network: "dynamo-fallback",
+        network_profile: (process.env.CANTON_NETWORK_PROFILE || "localnet") as "localnet" | "devnet" | "testnet" | "mainnet",
         domain: process.env.CANTON_DOMAIN || "",
         participant: process.env.CANTON_PARTICIPANT || "",
       }))
@@ -381,6 +382,7 @@ app.post("/v1/attestations/:id/anchor", async (req, res) => {
     res.json({
       anchored: true,
       network: result.network,
+      network_profile: result.network_profile,
       domain: result.domain,
       participant: result.participant,
       anchor: result.anchor,

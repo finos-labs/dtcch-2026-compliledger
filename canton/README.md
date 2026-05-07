@@ -64,6 +64,7 @@ Set `CANTON_LEDGER_API_URL=http://json-ledger-api.localhost` and run steps 4–5
 | `CANTON_PACKAGE_ID` | DAR package hash (from `setup-canton.sh`) | Yes |
 | `CANTON_DOMAIN` | Canton synchronizer domain name | No |
 | `CANTON_PARTICIPANT` | Participant node identifier | No |
+| `CANTON_NETWORK_PROFILE` | One of `localnet` / `devnet` / `testnet` / `mainnet` (default `localnet`). Informational; does not change submission behavior. See [`docs/DEVNET.md`](../docs/DEVNET.md). | No |
 
 If `CANTON_SUBMITTER_PARTY` or `CANTON_CUSTODIAN_PARTY` are not set, the backend
 falls back to DynamoDB/SQLite and the `/v1/canton/status` endpoint reports `not_configured`.
@@ -85,8 +86,43 @@ template SettlementCommitment
 
 ## Production (DevNet / TestNet / MainNet)
 
-1. Get a validator node (self-host or Node-as-a-Service)
-2. Upload the DAR via `POST /v2/packages/upload` on your participant
-3. Allocate parties via `POST /v2/parties/allocate`
-4. Set the env vars above in your ECS task definition
-5. The backend will use real Canton transactions — no code changes needed
+The same JSON Ledger API client is used for every Canton deployment target.
+The only differences are configuration — endpoints, party IDs, package ID, and
+JWT signing material — none of which are hardcoded in this repo.
+
+### Status today
+
+The currently shipped integration is verified against **LocalNet / a configured
+Canton JSON Ledger API** (DPM sandbox or CN Quickstart LocalNet). DevNet is
+**not** considered live until a `SettlementCommitment` contract is successfully
+created on a real DevNet validator.
+
+### DevNet readiness path
+
+1. Obtain a DevNet validator (self-host, or via a sponsoring Super Validator /
+   Node-as-a-Service). DevNet onboarding requires credentials from the operator
+   running the validator — this repo does not ship with any DevNet endpoints.
+2. Upload the DAR to your participant via `POST /v2/packages/upload`.
+3. Allocate the submitter and custodian parties via `POST /v2/parties/allocate`.
+4. Generate an RS256 JWT signing key and configure the matching public key on
+   your participant's OIDC provider (Auth0, Keycloak, etc.).
+5. Set the env vars in your deployment (ECS task def, Kubernetes secret, etc.):
+   - `CANTON_NETWORK_PROFILE=devnet`
+   - `CANTON_LEDGER_API_URL=https://<your-devnet-participant>`
+   - `CANTON_SUBMITTER_PARTY=<allocated submitter party id>`
+   - `CANTON_CUSTODIAN_PARTY=<allocated custodian party id>`
+   - `CANTON_PACKAGE_ID=<DAR package hash>`
+   - `CANTON_JWT_PRIVATE_KEY=<RS256 PEM>`
+   - `CANTON_JWT_AUDIENCE=<participant audience>`
+   - `CANTON_DOMAIN`, `CANTON_PARTICIPANT` for accurate reporting
+6. Verify with `GET /v1/canton/status`. The endpoint will only report
+   `"devnet_ready": true` when the configured validator answers `/livez` and
+   every required env var is populated.
+7. Anchor a real intent end-to-end via `POST /v1/attestations/:id/anchor` and
+   confirm the response includes a non-empty `canton_transaction.contract_id`.
+
+See [`docs/DEVNET.md`](../docs/DEVNET.md) for the full readiness checklist.
+
+The DynamoDB / SQLite fallback is preserved for every profile — if Canton is
+unreachable, anchoring still succeeds via the fallback and `network` is
+reported as `dynamo-fallback`.
