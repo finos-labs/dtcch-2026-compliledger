@@ -12,6 +12,10 @@ import { issueAttestation, recomputeAttestationHash } from "./attestation";
 import { saveIntent, getIntent, getIntentByBundleHash, getIntentByAttestationHash, updateAnchor, getAllIntents, setAnchorStatus } from "./db";
 import { PRESETS } from "./presets";
 import { RuleRegistry, ruleRegistry } from "./engine/ruleRegistry";
+import { validateISDAPayload } from "./rules/isda/schema";
+import { validateISLAPayload } from "./rules/isla/schema";
+import { validateICMAPayload } from "./rules/icma/schema";
+import type { SchemaValidationResult } from "./rules/isda/schema";
 import { evaluateRules, evaluateSettlementDecision } from "./engine/decisionProvider";
 import { anchorToDynamo, lookupByAttestationHash } from "./dynamo-anchor";
 import { anchorToCantonLedger, lookupCantonCommitment, getCantonNetworkStatus } from "./canton-ledger";
@@ -486,6 +490,27 @@ app.post("/v1/demo/evaluate", (req, res) => {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     res.status(400).json({ error: "payload is required and must be an object" });
     return;
+  }
+
+  // Validate payload shape against the rule pack's schema before evaluation
+  // so missing or wrong-typed fields surface as a clear 400 instead of being
+  // silently coerced into a FAIL outcome.
+  const schemaValidators: Record<string, (p: unknown) => SchemaValidationResult> = {
+    ISDA: validateISDAPayload,
+    ISLA: validateISLAPayload,
+    ICMA: validateICMAPayload,
+  };
+  const validator = schemaValidators[rule_pack];
+  if (validator) {
+    const validation = validator(payload);
+    if (!validation.ok) {
+      res.status(400).json({
+        error: `Invalid payload for rule_pack ${rule_pack}`,
+        rule_pack,
+        validation_errors: validation.errors,
+      });
+      return;
+    }
   }
 
   try {

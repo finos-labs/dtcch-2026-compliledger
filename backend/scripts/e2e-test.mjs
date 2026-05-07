@@ -673,16 +673,6 @@ async function main() {
       decision: "FAIL",
       codes: ["INSUFFICIENT_COLLATERAL"],
     },
-    {
-      label: "ISLA FAIL: missing numeric fields → FAIL",
-      pack: "ISLA",
-      payload: {
-        collateral_type: "GOVERNMENT_BOND",
-        allowed_types: ["GOVERNMENT_BOND"],
-      },
-      decision: "FAIL",
-      codes: ["INSUFFICIENT_COLLATERAL"],
-    },
     // ICMA
     {
       label: "ICMA PASS: sufficient collateral + valid maturity",
@@ -803,6 +793,48 @@ async function main() {
       body: "{}",
     });
     eq(res.status, 400, "HTTP status");
+  });
+
+  await test("evaluate: ISLA missing required numeric fields → 400 with validation_errors", async () => {
+    const { status, body } = await POST("/v1/demo/evaluate", {
+      rule_pack: "ISLA",
+      payload: {
+        collateral_type: "GOVERNMENT_BOND",
+        allowed_types: ["GOVERNMENT_BOND"],
+      },
+    });
+    eq(status, 400, "HTTP status");
+    hasKey(body, "error");
+    hasKey(body, "validation_errors");
+    isArray(body.validation_errors, "validation_errors");
+    eq(body.rule_pack, "ISLA", "rule_pack echo");
+  });
+
+  await test("evaluate: ISDA missing counterparty_status → 400", async () => {
+    const { status, body } = await POST("/v1/demo/evaluate", {
+      rule_pack: "ISDA",
+      payload: { required_margin: 1000, posted_collateral_value: 2000 },
+    });
+    eq(status, 400, "HTTP status");
+    isArray(body.validation_errors, "validation_errors");
+    assert(
+      body.validation_errors.some((e) => e.includes("counterparty_status")),
+      "validation_errors mentions counterparty_status"
+    );
+  });
+
+  await test("evaluate: ICMA wrong-typed field → 400", async () => {
+    const { status, body } = await POST("/v1/demo/evaluate", {
+      rule_pack: "ICMA",
+      payload: {
+        purchase_price: "not-a-number",
+        collateral_value: 1000,
+        current_date: 0,
+        end_date: 0,
+      },
+    });
+    eq(status, 400, "HTTP status");
+    isArray(body.validation_errors, "validation_errors");
   });
 
   // ── 10. Canton Commitments ───────────────────────────────────────────────────
