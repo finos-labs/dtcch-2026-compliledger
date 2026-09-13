@@ -144,6 +144,15 @@ export function ProofChainPanel({ result }: { result: EnforcementResult }): Reac
             </p>
           </div>
         </div>
+
+        {bundle.cdm_eligibility_assessment && (
+          <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400">CDM Eligibility Assessment</p>
+            <p className="mt-1 font-mono text-[11px] text-gray-700">
+              {bundle.cdm_eligibility_assessment.status}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

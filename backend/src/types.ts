@@ -3,6 +3,7 @@ export type IssuerStatus = "active" | "suspended";
 export type Classification = "tokenized_security" | "stablecoin" | "unknown";
 export type Decision = "ALLOW" | "DENY";
 export type RuleDecision = "PASS" | "FAIL" | "CONDITIONAL";
+import type { CdmEligibilityAssessment } from "./cdm/types";
 
 export interface SettlementIntent {
   asset_type: AssetType;
@@ -147,6 +148,8 @@ export interface ProofBundle {
   oss_evaluation?: OssEvaluation;
   /** Optional settlement decision evaluation embedded in the sealed bundle. */
   settlement_decision?: SettlementDecisionResult;
+  /** Optional CDM-backed collateral eligibility assessment embedded in the sealed bundle. */
+  cdm_eligibility_assessment?: CdmEligibilityAssessment;
 }
 
 export interface DecisionRecord {

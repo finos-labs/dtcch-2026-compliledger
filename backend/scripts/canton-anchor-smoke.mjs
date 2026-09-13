@@ -129,6 +129,9 @@ async function main() {
     custody_provider: "DTC Qualified Custodian",
     custody_valid: true,
     reserve_ratio: 1.0,
+    ...(process.env.CDM_SMOKE_REQUEST_JSON
+      ? { cdm_eligibility_request: JSON.parse(process.env.CDM_SMOKE_REQUEST_JSON) }
+      : {}),
   };
 
   let submitRes;

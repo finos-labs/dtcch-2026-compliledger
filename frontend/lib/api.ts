@@ -23,6 +23,14 @@ export interface ProofBundle {
   received_at: string;
   steps: ProofStep[];
   bundle_root_hash: string;
+  cdm_eligibility_assessment?: {
+    status: string;
+    evaluated_at: string;
+    query_hash?: string;
+    evidence_lineage_hash?: string;
+    error_code?: string;
+    error_message?: string;
+  };
 }
 
 export interface DecisionRecord {
