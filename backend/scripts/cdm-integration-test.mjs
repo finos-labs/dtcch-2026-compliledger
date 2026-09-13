@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-import { createHash, createHmac } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { canonicalStringify, sha256 } = require("../dist/crypto.js");
 
 const ENDPOINT = process.env.CDM_ELIGIBILITY_ENDPOINT || "";
 const SHARED_SECRET = process.env.CDM_RESPONSE_HMAC_SECRET || "";
@@ -33,17 +37,6 @@ const body = {
   },
 };
 
-function sortKeysDeep(value) {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
-  if (value && typeof value === "object") {
-    return Object.keys(value).sort().reduce((acc, key) => {
-      acc[key] = sortKeysDeep(value[key]);
-      return acc;
-    }, {});
-  }
-  return value;
-}
-
 const response = await fetch(ENDPOINT, {
   method: "POST",
   headers: {
@@ -61,9 +54,7 @@ if (!response.ok) {
 
 const payload = await response.json();
 const signature = response.headers.get("x-cdm-response-signature") || "";
-const contentHash = createHash("sha256")
-  .update(JSON.stringify(sortKeysDeep(payload)), "utf8")
-  .digest("hex");
+const contentHash = sha256(canonicalStringify(payload));
 const expected = createHmac("sha256", SHARED_SECRET).update(contentHash, "utf8").digest("hex");
 
 if (!signature || signature !== expected) {

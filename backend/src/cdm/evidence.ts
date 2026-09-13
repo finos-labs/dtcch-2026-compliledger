@@ -16,6 +16,7 @@ const ELIGIBILITY_QUERY_FIELDS: EligibilityQueryField[] = [
   "issuerType",
   "issuerName",
 ];
+const ELIGIBILITY_QUERY_FIELD_SET = new Set<EligibilityQueryField>(ELIGIBILITY_QUERY_FIELDS);
 
 function normalizeEvidenceArray(value: unknown): EvidenceReference[] {
   if (!Array.isArray(value)) return [];
@@ -26,7 +27,8 @@ function normalizeEvidenceArray(value: unknown): EvidenceReference[] {
       && typeof typed.source === "string"
       && typeof typed.attribute === "string"
       && typeof typed.claim_value === "string"
-      && typeof typed.observed_at === "string";
+      && typeof typed.observed_at === "string"
+      && ELIGIBILITY_QUERY_FIELD_SET.has(typed.attribute as EligibilityQueryField);
   });
 }
 
@@ -41,7 +43,7 @@ export function prepareEligibilityEvidence(request: CdmEligibilityRequest): Prep
     const sourceEvidence = request.query_evidence && typeof request.query_evidence === "object"
       ? request.query_evidence
       : {};
-    const references = normalizeEvidenceArray(sourceEvidence[field]);
+    const references = normalizeEvidenceArray(sourceEvidence[field]).filter((entry) => entry.attribute === field);
     evidenceLineage[field] = references;
 
     if (references.length === 0) {

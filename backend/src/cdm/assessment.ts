@@ -28,6 +28,7 @@ export function buildCdmEligibilityAssessment(input: BuildAssessmentInput): CdmE
       specification: input.request.specification,
       ...base,
       missing_fields: input.preparedEvidence.missing_fields,
+      conflicting_fields: input.preparedEvidence.conflicting_fields,
     };
   }
 
@@ -37,6 +38,7 @@ export function buildCdmEligibilityAssessment(input: BuildAssessmentInput): CdmE
       evaluated_at: evaluatedAt,
       specification: input.request.specification,
       ...base,
+      missing_fields: input.preparedEvidence.missing_fields,
       conflicting_fields: input.preparedEvidence.conflicting_fields,
     };
   }

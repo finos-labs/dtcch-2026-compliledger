@@ -15,6 +15,9 @@ const STEP_META: Record<string, { label: string; desc: string }> = {
 export function ProofChainPanel({ result }: { result: EnforcementResult }): ReactNode {
   const { bundle, decision } = result;
   const allPassed = bundle.steps.every((s) => s.pass);
+  const formattedCdmStatus = bundle.cdm_eligibility_assessment
+    ? bundle.cdm_eligibility_assessment.status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : "";
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -149,7 +152,7 @@ export function ProofChainPanel({ result }: { result: EnforcementResult }): Reac
           <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
             <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400">CDM Eligibility Assessment</p>
             <p className="mt-1 font-mono text-[11px] text-gray-700">
-              {bundle.cdm_eligibility_assessment.status}
+              {formattedCdmStatus}
             </p>
           </div>
         )}

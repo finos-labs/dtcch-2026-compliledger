@@ -37,7 +37,6 @@ guardStartup();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || "32kb";
-const cdmEligibilityAdapter = createCdmEligibilityAdapter();
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
@@ -142,6 +141,7 @@ async function resolveCdmEligibilityAssessment(
     return buildCdmEligibilityAssessment({ request, preparedEvidence });
   }
 
+  const cdmEligibilityAdapter = createCdmEligibilityAdapter();
   if (!cdmEligibilityAdapter) {
     return buildCdmEligibilityAssessment({
       request,

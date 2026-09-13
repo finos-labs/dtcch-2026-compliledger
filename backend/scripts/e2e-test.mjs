@@ -344,6 +344,12 @@ async function main() {
       hasKey(body.bundle.cdm_eligibility_assessment, "status");
       hasKey(body.bundle.cdm_eligibility_assessment, "query_hash");
       hasKey(body.bundle.cdm_eligibility_assessment, "evidence_lineage_hash");
+      assert(
+        ["eligible", "ineligible"].includes(body.bundle.cdm_eligibility_assessment.status),
+        `assessment status should be eligible/ineligible, got ${body.bundle.cdm_eligibility_assessment.status}`
+      );
+      hasKey(body.bundle.cdm_eligibility_assessment, "verification");
+      eq(body.bundle.cdm_eligibility_assessment.verification.verified, true, "verification.verified");
     });
 
     await test("CDM opt-in missing evidence → indeterminate_missing_evidence", async () => {
@@ -384,6 +390,42 @@ async function main() {
       eq(status, 201, "HTTP status");
       eq(body.bundle.cdm_eligibility_assessment.status, "indeterminate_conflicting_evidence", "assessment status");
     });
+
+    await test("CDM opt-in invalid request shape → technical_error", async () => {
+      const { status, body } = await POST("/v1/intents", {
+        asset_type: "stablecoin",
+        issuer_name: "CDM Invalid Request Issuer",
+        issuer_status: "active",
+        asset_id: "CDM-E2E-004",
+        classification: "stablecoin",
+        custody_provider: "Trust",
+        custody_valid: true,
+        reserve_ratio: 1.0,
+        cdm_eligibility_request: { query_evidence: cdmRequestBase.query_evidence },
+      });
+      eq(status, 201, "HTTP status");
+      eq(body.bundle.cdm_eligibility_assessment.status, "technical_error", "assessment status");
+      eq(body.bundle.cdm_eligibility_assessment.error_code, "invalid_cdm_request", "error_code");
+    });
+
+    if (process.env.CDM_EXPECT_UNVERIFIED === "true") {
+      await test("CDM unverified response gate → technical_error", async () => {
+        const { status, body } = await POST("/v1/intents", {
+          asset_type: "stablecoin",
+          issuer_name: "CDM Unverified Issuer",
+          issuer_status: "active",
+          asset_id: "CDM-E2E-005",
+          classification: "stablecoin",
+          custody_provider: "Trust",
+          custody_valid: true,
+          reserve_ratio: 1.0,
+          cdm_eligibility_request: cdmRequestBase,
+        });
+        eq(status, 201, "HTTP status");
+        eq(body.bundle.cdm_eligibility_assessment.status, "technical_error", "assessment status");
+        eq(body.bundle.cdm_eligibility_assessment.error_code, "unverified_cdm_response", "error_code");
+      });
+    }
   } else {
     skip("CDM opt-in tests", "set CDM_E2E_ENABLED=true with CDM adapter configuration");
   }
