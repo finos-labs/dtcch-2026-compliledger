@@ -264,6 +264,7 @@ await test("MANUAL_REVIEW on conflicting evidence, duplicate IDs, and collateral
     "MANUAL_REVIEW_REQUIRED",
   ]);
   assert.deepEqual(assessment.conflicting_fields, ["agencyRating"]);
+  assert.equal(assessment.query, undefined);
 });
 
 await test("NOT_EVALUABLE when provider is absent or throws configuration/runtime errors", async () => {
@@ -380,6 +381,25 @@ await test("specification reference-only requests need a resolver and determinis
   });
   assert.equal(resolvedOnce.assessment_id, resolvedTwice.assessment_id);
   assert.deepEqual(resolvedOnce.reason_codes, resolvedTwice.reason_codes);
+});
+
+await test("specification reference mismatches require manual review", async () => {
+  const assessment = await evaluateEvidenceBackedCollateralEligibility(makeRequest({
+    specification_reference: "SPEC-ALT",
+  }), {
+    evaluatedAt: FIXED_EVALUATED_AT,
+    provider: {
+      async evaluateEligibility() {
+        throw new Error("should not be called");
+      },
+    },
+  });
+
+  assert.equal(assessment.status, "MANUAL_REVIEW");
+  assert.deepEqual(assessment.reason_codes, [
+    "SPECIFICATION_REFERENCE_MISMATCH",
+    "MANUAL_REVIEW_REQUIRED",
+  ]);
 });
 
 await test("lineage hash changes when rejected evidence changes", async () => {

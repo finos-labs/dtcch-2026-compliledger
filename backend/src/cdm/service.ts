@@ -465,8 +465,9 @@ export async function evaluateEvidenceBackedCollateralEligibility(
   };
 
   if (evidenceGate || !specification || !preparedEvidence.query) {
-    const status = evidenceGate?.status ?? "NOT_EVALUABLE";
-    const evidenceReasonCodes = evidenceGate?.reasonCodes ?? normalizeReasonCodes(reasonCodes);
+    const derivedGate = evidenceGate ?? resolveEvidenceGateStatus(reasonCodes);
+    const status = derivedGate?.status ?? "NOT_EVALUABLE";
+    const evidenceReasonCodes = derivedGate?.reasonCodes ?? normalizeReasonCodes(reasonCodes);
     return buildAssessment(
       request,
       preparedEvidenceWithAllDiagnostics,

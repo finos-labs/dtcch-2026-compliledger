@@ -206,6 +206,7 @@ export function prepareEligibilityEvidence(
   const conflictingFields: EligibilityQueryField[] = [];
   const invalidFields = new Set<EligibilityQueryField>();
   const staleFields = new Set<EligibilityQueryField>();
+  const duplicateIdFields = new Set<EligibilityQueryField>();
   const evidenceReferenceIds = new Set<string>();
   const seenEvidenceIds = new Map<string, string>();
   const queryCandidate = {} as EligibilityQuery;
@@ -298,6 +299,7 @@ export function prepareEligibilityEvidence(
     });
     const existingCanonicalEntry = seenEvidenceIds.get(evidenceId as string);
     if (existingCanonicalEntry) {
+      duplicateIdFields.add(field as EligibilityQueryField);
       const message = "Duplicate evidence_id detected in evidence package";
       addDiagnostic(diagnostics, {
         reason_code: "EVIDENCE_DUPLICATE_ID",
@@ -423,7 +425,9 @@ export function prepareEligibilityEvidence(
       submitted_evidence: submittedEvidence,
     }))
     : null;
-  const query = dedupedConflictingFields.length === 0 && sortedMissingFields.length === 0
+  const query = dedupedConflictingFields.length === 0
+    && sortedMissingFields.length === 0
+    && duplicateIdFields.size === 0
     ? queryCandidate
     : undefined;
 
