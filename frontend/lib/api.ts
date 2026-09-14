@@ -34,10 +34,10 @@ export interface ProofBundle {
     missing_fields?: string[];
     conflicting_fields?: string[];
     cdm_function?: {
-      function_name: string;
-      model_name: string;
-      model_version: string;
-      runtime: string;
+      provider_name: string;
+      cdm_function: "cdm.product.collateral.CheckEligibilityByDetails";
+      cdm_model_version: string;
+      provider_version: string;
     };
     verification?: {
       verified: boolean;

@@ -631,6 +631,36 @@ CANTON_PARTICIPANT=sg-participant-01
 DYNAMO_TABLE=sg-commitment-registry
 ```
 
+### CDM collateral eligibility provider boundary
+
+SettlementGuard can optionally attach a `cdm_eligibility_assessment` to the sealed bundle when
+`cdm_eligibility_request` is supplied. Phase 2 keeps SettlementGuard on an adapter boundary:
+it prepares evidence-backed collateral attributes locally, then calls a provider for
+`cdm.product.collateral.CheckEligibilityByDetails`. SettlementGuard does **not** recreate the
+CDM eligibility algorithm locally.
+
+- `ExternalCdmEligibilityProvider` sends the local adapter DTOs (`EligibleCollateralSpecification`
+  plus `EligibilityQuery`) to a configured HTTP endpoint and accepts a
+  `CheckEligibilityResult`-compatible response.
+- `MockCdmEligibilityProvider` is a **TEST/REFERENCE ONLY** provider for local demos and tests.
+  It returns explicitly configured canned fixtures and must not be treated as a real CDM engine.
+- Provider failures are returned as explicit `technical_error` assessments; SettlementGuard never
+  infers eligibility from an unavailable or invalid provider response.
+
+Relevant environment variables:
+
+| Variable | Description |
+|---|---|
+| `CDM_ELIGIBILITY_ENDPOINT` | External provider URL for collateral eligibility evaluation |
+| `CDM_ELIGIBILITY_AUTH_TOKEN` | Optional bearer token for the external provider |
+| `CDM_ELIGIBILITY_AUTH_HEADER` | Optional full `Authorization` header value |
+| `CDM_ELIGIBILITY_TIMEOUT_MS` | External provider timeout in milliseconds |
+| `CDM_ELIGIBILITY_PROVIDER_VERSION` | Local metadata version for the provider wrapper |
+| `CDM_MODEL_VERSION` | CDM model version recorded in provider metadata |
+| `CDM_RESPONSE_HMAC_SECRET` | Optional shared secret for verifying signed provider responses |
+| `CDM_ELIGIBILITY_PROVIDER=mock` | Enables the mock **TEST/REFERENCE ONLY** provider |
+| `CDM_ELIGIBILITY_MOCK_RESPONSE` | JSON-encoded canned `CheckEligibilityResult` fixture for the mock provider |
+
 ### Authentication & route scopes
 
 The backend supports two authentication modes (configure at least one):
