@@ -14,6 +14,11 @@ if (!ENDPOINT) {
   process.exit(2);
 }
 
+if (!SHARED_SECRET) {
+  console.error("CDM_RESPONSE_HMAC_SECRET is required");
+  process.exit(2);
+}
+
 const body = {
   cdm_function: "cdm.product.collateral.CheckEligibilityByDetails",
   specification: {
@@ -49,16 +54,13 @@ if (!response.ok) {
 
 const payload = await response.json();
 const result = payload?.result ?? payload;
+const signature = response.headers.get("x-cdm-response-signature") || "";
+const contentHash = sha256(canonicalStringify(payload));
+const expected = createHmac("sha256", SHARED_SECRET).update(contentHash, "utf8").digest("hex");
 
-if (SHARED_SECRET) {
-  const signature = response.headers.get("x-cdm-response-signature") || "";
-  const contentHash = sha256(canonicalStringify(payload));
-  const expected = createHmac("sha256", SHARED_SECRET).update(contentHash, "utf8").digest("hex");
-
-  if (!signature || signature !== expected) {
-    console.error("CDM response signature verification failed");
-    process.exit(1);
-  }
+if (!signature || signature !== expected) {
+  console.error("CDM response signature verification failed");
+  process.exit(1);
 }
 
 if (!result || typeof result.isEligible !== "boolean") {

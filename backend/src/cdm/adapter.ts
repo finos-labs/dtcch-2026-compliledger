@@ -41,6 +41,12 @@ export function createCollateralEligibilityProvider(): CollateralEligibilityProv
       "CDM_ELIGIBILITY_ENDPOINT is required when CDM_ELIGIBILITY_PROVIDER=external"
     );
   }
+  if (endpoint && !process.env.CDM_RESPONSE_HMAC_SECRET) {
+    throw new CdmEligibilityProviderError(
+      "invalid_provider_configuration",
+      "CDM_RESPONSE_HMAC_SECRET is required when configuring an external CDM eligibility provider"
+    );
+  }
   if (!endpoint) return null;
   return new ExternalCdmEligibilityProvider({
     url: endpoint,

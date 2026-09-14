@@ -155,6 +155,19 @@ await test("Provider factory rejects external provider without endpoint", async 
   });
 });
 
+await test("Provider factory rejects external provider without verification secret", async () => {
+  await withEnv({
+    CDM_ELIGIBILITY_PROVIDER: "external",
+    CDM_ELIGIBILITY_ENDPOINT: "http://example.test/cdm",
+    CDM_RESPONSE_HMAC_SECRET: "",
+  }, async () => {
+    assert.throws(
+      () => createCollateralEligibilityProvider(),
+      (error) => error && error.code === "invalid_provider_configuration"
+    );
+  });
+});
+
 await test("Provider factory surfaces invalid mock fixture configuration", async () => {
   await withEnv({
     CDM_ELIGIBILITY_PROVIDER: "mock",

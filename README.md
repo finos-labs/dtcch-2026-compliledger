@@ -657,7 +657,7 @@ Relevant environment variables:
 | `CDM_ELIGIBILITY_TIMEOUT_MS` | External provider timeout in milliseconds |
 | `CDM_ELIGIBILITY_PROVIDER_VERSION` | Local metadata version for the provider wrapper |
 | `CDM_MODEL_VERSION` | CDM model version recorded in provider metadata |
-| `CDM_RESPONSE_HMAC_SECRET` | Optional shared secret for verifying signed provider responses |
+| `CDM_RESPONSE_HMAC_SECRET` | Shared secret required for configuring an external provider; external responses fail closed if they cannot be verified |
 | `CDM_ELIGIBILITY_PROVIDER=mock` | Enables the mock **TEST/REFERENCE ONLY** provider |
 | `CDM_ELIGIBILITY_MOCK_RESPONSE` | JSON-encoded canned `CheckEligibilityResult` fixture for the mock provider |
 
