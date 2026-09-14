@@ -4,6 +4,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const { createCollateralEligibilityProvider } = require("../dist/cdm/adapter.js");
 const { MockCdmEligibilityProvider } = require("../dist/cdm/mockProvider.js");
 const {
   ExternalCdmEligibilityProvider,
@@ -47,6 +48,23 @@ function makeResult(isEligible) {
     eligibilityQuery: baseQuery,
     specification: baseSpecification,
   };
+}
+
+async function withEnv(overrides, fn) {
+  const keys = Object.keys(overrides);
+  const previous = new Map(keys.map((key) => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    await fn();
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 async function withServer(handler, fn) {
@@ -107,6 +125,45 @@ await test("External provider rejects invalid responses", async () => {
     await assert.rejects(
       () => provider.evaluateEligibility(baseSpecification, baseQuery),
       (error) => error && error.code === "invalid_provider_response"
+    );
+  });
+});
+
+await test("Provider factory rejects unsupported provider configuration", async () => {
+  await withEnv({
+    CDM_ELIGIBILITY_PROVIDER: "invalid-provider",
+    CDM_ELIGIBILITY_ENDPOINT: undefined,
+  }, async () => {
+    assert.throws(
+      () => createCollateralEligibilityProvider(),
+      (error) => error && error.code === "invalid_provider_configuration"
+    );
+  });
+});
+
+await test("Provider factory rejects external provider without endpoint", async () => {
+  await withEnv({
+    CDM_ELIGIBILITY_PROVIDER: "external",
+    CDM_ELIGIBILITY_ENDPOINT: "",
+  }, async () => {
+    assert.throws(
+      () => createCollateralEligibilityProvider(),
+      (error) => error && error.code === "invalid_provider_configuration"
+    );
+  });
+});
+
+await test("Provider factory surfaces invalid mock fixture configuration", async () => {
+  await withEnv({
+    CDM_ELIGIBILITY_PROVIDER: "mock",
+    CDM_ELIGIBILITY_MOCK_RESPONSE: "{not-json",
+    CDM_ELIGIBILITY_ENDPOINT: undefined,
+  }, async () => {
+    const provider = createCollateralEligibilityProvider();
+    assert.ok(provider);
+    await assert.rejects(
+      () => provider.evaluateEligibility(baseSpecification, baseQuery),
+      (error) => error && error.code === "invalid_mock_configuration"
     );
   });
 });

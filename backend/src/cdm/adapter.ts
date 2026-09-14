@@ -35,6 +35,12 @@ export function createCollateralEligibilityProvider(): CollateralEligibilityProv
   }
 
   const endpoint = process.env.CDM_ELIGIBILITY_ENDPOINT;
+  if (providerType === "external" && !endpoint) {
+    throw new CdmEligibilityProviderError(
+      "invalid_provider_configuration",
+      "CDM_ELIGIBILITY_ENDPOINT is required when CDM_ELIGIBILITY_PROVIDER=external"
+    );
+  }
   if (!endpoint) return null;
   return new ExternalCdmEligibilityProvider({
     url: endpoint,

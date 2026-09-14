@@ -125,7 +125,7 @@ export class ExternalCdmEligibilityProvider implements CollateralEligibilityProv
         provider_version: this.providerVersion,
       };
 
-      if (isRecord(payload) && isRecord(payload.metadata)) {
+      if (verification.verified && isRecord(payload) && isRecord(payload.metadata)) {
         if (typeof payload.metadata.provider_name === "string") {
           metadata.provider_name = payload.metadata.provider_name;
         }
