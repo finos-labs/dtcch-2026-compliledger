@@ -118,6 +118,12 @@ export class ExternalCdmEligibilityProvider implements CollateralEligibilityProv
       this.assertValidEligibilityResult(result);
 
       const verification = this.verifyResponse(response.headers, payload);
+      if (!verification.verified) {
+        throw new CdmEligibilityProviderError(
+          "unverified_provider_response",
+          `CDM response verification failed${verification.reason ? `: ${verification.reason}` : ""}`
+        );
+      }
       const metadata: CdmFunctionMetadata = {
         provider_name: this.providerName,
         cdm_function: CDM_COLLATERAL_ELIGIBILITY_FUNCTION,
@@ -125,7 +131,7 @@ export class ExternalCdmEligibilityProvider implements CollateralEligibilityProv
         provider_version: this.providerVersion,
       };
 
-      if (verification.verified && isRecord(payload) && isRecord(payload.metadata)) {
+      if (isRecord(payload) && isRecord(payload.metadata)) {
         if (typeof payload.metadata.provider_name === "string") {
           metadata.provider_name = payload.metadata.provider_name;
         }

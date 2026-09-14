@@ -83,6 +83,8 @@ await test("Mock provider returns configured eligible fixture", async () => {
   const provider = new MockCdmEligibilityProvider({ defaultResult: makeResult(true) });
   const response = await provider.evaluateEligibility(baseSpecification, baseQuery);
   assert.equal(response.result.isEligible, true);
+  assert.deepEqual(response.result.eligibilityQuery, baseQuery);
+  assert.deepEqual(response.result.specification, baseSpecification);
   assert.match(response.metadata.provider_name, /TEST\/REFERENCE ONLY/);
   assert.equal(response.metadata.cdm_function, "cdm.product.collateral.CheckEligibilityByDetails");
 });

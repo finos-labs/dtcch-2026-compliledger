@@ -67,7 +67,7 @@ export class MockCdmEligibilityProvider implements CollateralEligibilityProvider
 
   async evaluateEligibility(
     specification: EligibleCollateralSpecification,
-    _query: EligibilityQuery
+    query: EligibilityQuery
   ): Promise<CdmEligibilityEvaluationResponse> {
     if (this.configurationError) {
       throw new CdmEligibilityProviderError("invalid_mock_configuration", this.configurationError);
@@ -95,9 +95,14 @@ export class MockCdmEligibilityProvider implements CollateralEligibilityProvider
       verified: true,
       reason: "test_reference_provider",
     };
+    const resolvedResult = structuredClone({
+      ...result,
+      eligibilityQuery: query,
+      specification,
+    });
 
     return {
-      result: structuredClone(result),
+      result: resolvedResult,
       metadata: {
         provider_name: MOCK_PROVIDER_NAME,
         cdm_function: CDM_COLLATERAL_ELIGIBILITY_FUNCTION,
