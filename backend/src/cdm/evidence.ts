@@ -298,8 +298,6 @@ export function prepareEligibilityEvidence(
     });
     const existingCanonicalEntry = seenEvidenceIds.get(evidenceId as string);
     if (existingCanonicalEntry) {
-      invalidFields.add(field as EligibilityQueryField);
-      conflictingFields.push(field as EligibilityQueryField);
       const message = "Duplicate evidence_id detected in evidence package";
       addDiagnostic(diagnostics, {
         reason_code: "EVIDENCE_DUPLICATE_ID",
@@ -317,6 +315,8 @@ export function prepareEligibilityEvidence(
         )
       );
       if (existingCanonicalEntry !== canonicalEntry) {
+        invalidFields.add(field as EligibilityQueryField);
+        conflictingFields.push(field as EligibilityQueryField);
         addDiagnostic(diagnostics, {
           reason_code: "EVIDENCE_CONFLICT",
           message: "Duplicate evidence_id carries conflicting evidence content",

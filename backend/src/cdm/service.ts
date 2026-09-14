@@ -37,6 +37,7 @@ const REASON_CODE_ORDER: CdmEligibilityAssessmentReasonCode[] = [
   "CDM_EVALUATION_UNAVAILABLE",
   "PROVIDER_NOT_CONFIGURED",
   "PROVIDER_CONFIGURATION_ERROR",
+  "PROVIDER_UNAVAILABLE",
   "PROVIDER_RESPONSE_INVALID",
   "PROVIDER_RESPONSE_UNVERIFIED",
   "CDM_COLLATERAL_ELIGIBLE",
@@ -392,6 +393,22 @@ function resolveEvidenceGateStatus(
   return null;
 }
 
+function classifyProviderFailureReasonCodes(
+  error: unknown
+): CdmEligibilityAssessmentReasonCode[] {
+  const code = error instanceof CdmEligibilityProviderError ? error.code : "";
+  if (code === "invalid_provider_configuration" || code === "invalid_mock_configuration") {
+    return ["CDM_EVALUATION_UNAVAILABLE", "PROVIDER_CONFIGURATION_ERROR"];
+  }
+  if (code === "invalid_provider_response") {
+    return ["CDM_EVALUATION_UNAVAILABLE", "PROVIDER_RESPONSE_INVALID"];
+  }
+  if (code === "unverified_provider_response") {
+    return ["CDM_EVALUATION_UNAVAILABLE", "PROVIDER_RESPONSE_UNVERIFIED"];
+  }
+  return ["CDM_EVALUATION_UNAVAILABLE", "PROVIDER_UNAVAILABLE"];
+}
+
 export async function evaluateEvidenceBackedCollateralEligibility(
   request: CdmEligibilityRequest,
   options: EvaluateEvidenceBackedCollateralEligibilityOptions = {}
@@ -579,6 +596,7 @@ export async function evaluateEvidenceBackedCollateralEligibility(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown CDM provider evaluation failure";
     const code = error instanceof CdmEligibilityProviderError ? error.code : "cdm_provider_error";
+    const reasonCodes = classifyProviderFailureReasonCodes(error);
     return buildAssessment(
       request,
       preparedEvidenceWithAllDiagnostics,
@@ -586,14 +604,14 @@ export async function evaluateEvidenceBackedCollateralEligibility(
       specificationReference,
       evaluatedAt,
       "NOT_EVALUABLE",
-      ["CDM_EVALUATION_UNAVAILABLE", "PROVIDER_RESPONSE_INVALID"],
+      reasonCodes,
       {
         errorCode: code,
         errorMessage: message,
         assessmentIdFactory: options.assessmentIdFactory,
         extraDiagnostics: [
           createDiagnostic("CDM_EVALUATION_UNAVAILABLE", message),
-          createDiagnostic("PROVIDER_RESPONSE_INVALID", message),
+          createDiagnostic(reasonCodes[1] ?? "PROVIDER_UNAVAILABLE", message),
         ],
       }
     );

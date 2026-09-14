@@ -263,7 +263,7 @@ await test("MANUAL_REVIEW on conflicting evidence, duplicate IDs, and collateral
     "EVIDENCE_CONFLICT",
     "MANUAL_REVIEW_REQUIRED",
   ]);
-  assert.deepEqual(assessment.conflicting_fields, ["agencyRating", "issuerType"]);
+  assert.deepEqual(assessment.conflicting_fields, ["agencyRating"]);
 });
 
 await test("NOT_EVALUABLE when provider is absent or throws configuration/runtime errors", async () => {
@@ -287,6 +287,20 @@ await test("NOT_EVALUABLE when provider is absent or throws configuration/runtim
   assert.deepEqual(thrown.reason_codes, [
     "CDM_EVALUATION_UNAVAILABLE",
     "PROVIDER_CONFIGURATION_ERROR",
+  ]);
+
+  const unavailable = await evaluateEvidenceBackedCollateralEligibility(makeRequest(), {
+    evaluatedAt: FIXED_EVALUATED_AT,
+    provider: {
+      async evaluateEligibility() {
+        throw new CdmEligibilityProviderError("provider_timeout", "timed out");
+      },
+    },
+  });
+  assert.equal(unavailable.status, "NOT_EVALUABLE");
+  assert.deepEqual(unavailable.reason_codes, [
+    "CDM_EVALUATION_UNAVAILABLE",
+    "PROVIDER_UNAVAILABLE",
   ]);
 });
 
