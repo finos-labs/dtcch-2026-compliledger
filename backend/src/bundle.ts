@@ -1,4 +1,11 @@
-import type { SettlementIntent, ProofStepResult, ProofBundle, OssEvaluation, SettlementDecisionResult } from "./types";
+import type {
+  SettlementIntent,
+  ProofStepResult,
+  ProofBundle,
+  OssEvaluation,
+  SettlementDecisionResult,
+} from "./types";
+import type { CdmEligibilityAssessment } from "./cdm/types";
 import { canonicalStringify, sha256 } from "./crypto";
 
 const BUNDLE_VERSION = "sg-v1";
@@ -9,7 +16,8 @@ export function sealBundle(
   intent: SettlementIntent,
   steps: ProofStepResult[],
   ossEvaluation?: OssEvaluation,
-  settlementDecision?: SettlementDecisionResult
+  settlementDecision?: SettlementDecisionResult,
+  cdmEligibilityAssessment?: CdmEligibilityAssessment
 ): ProofBundle {
   const bundle: Omit<ProofBundle, "bundle_root_hash"> = {
     bundle_version: BUNDLE_VERSION,
@@ -19,6 +27,7 @@ export function sealBundle(
     steps,
     ...(ossEvaluation && { oss_evaluation: ossEvaluation }),
     ...(settlementDecision && { settlement_decision: settlementDecision }),
+    ...(cdmEligibilityAssessment && { cdm_eligibility_assessment: cdmEligibilityAssessment }),
   };
 
   const bundleRootHash = sha256(canonicalStringify(bundle));

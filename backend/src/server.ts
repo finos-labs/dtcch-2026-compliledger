@@ -27,6 +27,10 @@ import { guardStartup, requireAuth, requireScope } from "./middleware/auth";
 import type { AuthenticatedRequest } from "./middleware/auth";
 import { writeRegulatoryEvent, getRegulatoryEvents } from "./audit/regulatory-log";
 import { cantonCircuit, bedrockCircuit } from "./circuit-breaker";
+import type { CdmEligibilityAssessment, CdmEligibilityRequest } from "./cdm/types";
+import { prepareEligibilityEvidence } from "./cdm/evidence";
+import { createCdmEligibilityAdapter } from "./cdm/adapter";
+import { buildCdmEligibilityAssessment } from "./cdm/assessment";
 
 guardStartup();
 
@@ -114,6 +118,60 @@ function resolveSettlementDecision(
   });
 }
 
+async function resolveCdmEligibilityAssessment(
+  body: Record<string, unknown>
+): Promise<CdmEligibilityAssessment | undefined> {
+  if (!body.cdm_eligibility_request || typeof body.cdm_eligibility_request !== "object") {
+    return undefined;
+  }
+
+  const request = body.cdm_eligibility_request as CdmEligibilityRequest;
+  if (!request.specification || typeof request.specification !== "object") {
+    return {
+      status: "technical_error",
+      evaluated_at: new Date().toISOString(),
+      specification: { criteria: {} },
+      error_code: "invalid_cdm_request",
+      error_message: "cdm_eligibility_request.specification is required",
+    };
+  }
+  const preparedEvidence = prepareEligibilityEvidence(request);
+
+  if (preparedEvidence.missing_fields.length > 0 || preparedEvidence.conflicting_fields.length > 0) {
+    return buildCdmEligibilityAssessment({ request, preparedEvidence });
+  }
+
+  const cdmEligibilityAdapter = createCdmEligibilityAdapter();
+  if (!cdmEligibilityAdapter) {
+    return buildCdmEligibilityAssessment({
+      request,
+      preparedEvidence,
+      technicalError: {
+        code: "cdm_adapter_not_configured",
+        message: "CDM eligibility adapter is not configured",
+      },
+    });
+  }
+
+  try {
+    const cdmResponse = await cdmEligibilityAdapter.evaluate({
+      specification: request.specification,
+      query: preparedEvidence.query,
+    });
+    return buildCdmEligibilityAssessment({ request, preparedEvidence, cdmResponse });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown CDM adapter error";
+    return buildCdmEligibilityAssessment({
+      request,
+      preparedEvidence,
+      technicalError: {
+        code: "cdm_adapter_error",
+        message,
+      },
+    });
+  }
+}
+
 function validateIntent(body: unknown): { valid: boolean; error?: string; intent?: SettlementIntent } {
   const b = body as Record<string, unknown>;
 
@@ -169,7 +227,16 @@ app.post("/v1/intents", async (req: AuthenticatedRequest, res) => {
 
   const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
   const settlementDecision = resolveSettlementDecision(req.body as Record<string, unknown>, intentId);
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation, settlementDecision);
+  const cdmEligibilityAssessment = await resolveCdmEligibilityAssessment(req.body as Record<string, unknown>);
+  const bundle = sealBundle(
+    intentHash,
+    receivedAt,
+    intent,
+    steps,
+    ossEvaluation,
+    settlementDecision,
+    cdmEligibilityAssessment
+  );
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;
@@ -228,7 +295,16 @@ app.post("/v1/intents/preset/:presetId", async (req: AuthenticatedRequest, res) 
   const steps = await executeProofChain(intent);
   const ossEvaluation = resolveOssEvaluation(req.body as Record<string, unknown>);
   const settlementDecision = resolveSettlementDecision(req.body as Record<string, unknown>, intentId);
-  const bundle = sealBundle(intentHash, receivedAt, intent, steps, ossEvaluation, settlementDecision);
+  const cdmEligibilityAssessment = await resolveCdmEligibilityAssessment(req.body as Record<string, unknown>);
+  const bundle = sealBundle(
+    intentHash,
+    receivedAt,
+    intent,
+    steps,
+    ossEvaluation,
+    settlementDecision,
+    cdmEligibilityAssessment
+  );
   const decisionRecord = computeDecision(steps, bundle.bundle_root_hash);
 
   let signedAttestation = null;

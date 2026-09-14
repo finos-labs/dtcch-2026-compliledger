@@ -14,6 +14,7 @@
 
 const BASE = process.argv[2]?.replace(/\/$/, "") || "http://localhost:3001";
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || "";
+const CDM_E2E_ENABLED = process.env.CDM_E2E_ENABLED === "true";
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 const G    = (s) => `\x1b[32m${s}\x1b[0m`;
@@ -304,6 +305,130 @@ async function main() {
     eq(body.bundle.oss_evaluation.decision, "PASS", "oss decision");
     isArray(body.bundle.oss_evaluation.reason_codes, "oss reason_codes");
   });
+
+  section("CDM Eligibility Assessment (opt-in)");
+
+  const cdmRequestBase = {
+    specification: {
+      id: "SPEC-001",
+      name: "GMSLA Eligible Collateral",
+      version: "1.0",
+      criteria: { schedule: "demo" },
+    },
+    query_evidence: {
+      maturity: [{ evidence_id: "ev-maturity-1", source: "issuer-feed", attribute: "maturity", claim_value: "2028-12-31", observed_at: new Date().toISOString() }],
+      collateralAssetType: [{ evidence_id: "ev-asset-type-1", source: "security-master", attribute: "collateralAssetType", claim_value: "GOVERNMENT_BOND", observed_at: new Date().toISOString() }],
+      assetCountryOfOrigin: [{ evidence_id: "ev-country-1", source: "security-master", attribute: "assetCountryOfOrigin", claim_value: "US", observed_at: new Date().toISOString() }],
+      denominatedCurrency: [{ evidence_id: "ev-currency-1", source: "security-master", attribute: "denominatedCurrency", claim_value: "USD", observed_at: new Date().toISOString() }],
+      agencyRating: [{ evidence_id: "ev-rating-1", source: "rating-feed", attribute: "agencyRating", claim_value: "AA", observed_at: new Date().toISOString() }],
+      issuerType: [{ evidence_id: "ev-issuer-type-1", source: "issuer-feed", attribute: "issuerType", claim_value: "SOVEREIGN", observed_at: new Date().toISOString() }],
+      issuerName: [{ evidence_id: "ev-issuer-name-1", source: "issuer-feed", attribute: "issuerName", claim_value: "US TREASURY", observed_at: new Date().toISOString() }],
+    },
+  };
+
+  if (CDM_E2E_ENABLED) {
+    await test("CDM opt-in with complete evidence → cdm_eligibility_assessment present", async () => {
+      const { status, body } = await POST("/v1/intents", {
+        asset_type: "stablecoin",
+        issuer_name: "CDM Eligible Issuer",
+        issuer_status: "active",
+        asset_id: "CDM-E2E-001",
+        classification: "stablecoin",
+        custody_provider: "Trust",
+        custody_valid: true,
+        reserve_ratio: 1.0,
+        cdm_eligibility_request: cdmRequestBase,
+      });
+      eq(status, 201, "HTTP status");
+      hasKey(body.bundle, "cdm_eligibility_assessment");
+      hasKey(body.bundle.cdm_eligibility_assessment, "status");
+      hasKey(body.bundle.cdm_eligibility_assessment, "query_hash");
+      hasKey(body.bundle.cdm_eligibility_assessment, "evidence_lineage_hash");
+      assert(
+        ["eligible", "ineligible"].includes(body.bundle.cdm_eligibility_assessment.status),
+        `assessment status should be eligible/ineligible, got ${body.bundle.cdm_eligibility_assessment.status}`
+      );
+      hasKey(body.bundle.cdm_eligibility_assessment, "verification");
+      eq(body.bundle.cdm_eligibility_assessment.verification.verified, true, "verification.verified");
+    });
+
+    await test("CDM opt-in missing evidence → indeterminate_missing_evidence", async () => {
+      const req = structuredClone(cdmRequestBase);
+      delete req.query_evidence.issuerName;
+      const { status, body } = await POST("/v1/intents", {
+        asset_type: "stablecoin",
+        issuer_name: "CDM Missing Evidence Issuer",
+        issuer_status: "active",
+        asset_id: "CDM-E2E-002",
+        classification: "stablecoin",
+        custody_provider: "Trust",
+        custody_valid: true,
+        reserve_ratio: 1.0,
+        cdm_eligibility_request: req,
+      });
+      eq(status, 201, "HTTP status");
+      eq(body.bundle.cdm_eligibility_assessment.status, "indeterminate_missing_evidence", "assessment status");
+    });
+
+    await test("CDM opt-in conflicting evidence → indeterminate_conflicting_evidence", async () => {
+      const req = structuredClone(cdmRequestBase);
+      req.query_evidence.issuerType = [
+        ...req.query_evidence.issuerType,
+        { evidence_id: "ev-issuer-type-2", source: "issuer-feed", attribute: "issuerType", claim_value: "CORPORATE", observed_at: new Date().toISOString() },
+      ];
+      const { status, body } = await POST("/v1/intents", {
+        asset_type: "stablecoin",
+        issuer_name: "CDM Conflict Issuer",
+        issuer_status: "active",
+        asset_id: "CDM-E2E-003",
+        classification: "stablecoin",
+        custody_provider: "Trust",
+        custody_valid: true,
+        reserve_ratio: 1.0,
+        cdm_eligibility_request: req,
+      });
+      eq(status, 201, "HTTP status");
+      eq(body.bundle.cdm_eligibility_assessment.status, "indeterminate_conflicting_evidence", "assessment status");
+    });
+
+    await test("CDM opt-in invalid request shape → technical_error", async () => {
+      const { status, body } = await POST("/v1/intents", {
+        asset_type: "stablecoin",
+        issuer_name: "CDM Invalid Request Issuer",
+        issuer_status: "active",
+        asset_id: "CDM-E2E-004",
+        classification: "stablecoin",
+        custody_provider: "Trust",
+        custody_valid: true,
+        reserve_ratio: 1.0,
+        cdm_eligibility_request: { query_evidence: cdmRequestBase.query_evidence },
+      });
+      eq(status, 201, "HTTP status");
+      eq(body.bundle.cdm_eligibility_assessment.status, "technical_error", "assessment status");
+      eq(body.bundle.cdm_eligibility_assessment.error_code, "invalid_cdm_request", "error_code");
+    });
+
+    if (process.env.CDM_EXPECT_UNVERIFIED === "true") {
+      await test("CDM unverified response gate → technical_error", async () => {
+        const { status, body } = await POST("/v1/intents", {
+          asset_type: "stablecoin",
+          issuer_name: "CDM Unverified Issuer",
+          issuer_status: "active",
+          asset_id: "CDM-E2E-005",
+          classification: "stablecoin",
+          custody_provider: "Trust",
+          custody_valid: true,
+          reserve_ratio: 1.0,
+          cdm_eligibility_request: cdmRequestBase,
+        });
+        eq(status, 201, "HTTP status");
+        eq(body.bundle.cdm_eligibility_assessment.status, "technical_error", "assessment status");
+        eq(body.bundle.cdm_eligibility_assessment.error_code, "unverified_cdm_response", "error_code");
+      });
+    }
+  } else {
+    skip("CDM opt-in tests", "set CDM_E2E_ENABLED=true with CDM adapter configuration");
+  }
 
   // ── 3. Input Validation ─────────────────────────────────────────────────────
   section("POST /v1/intents — Input Validation");

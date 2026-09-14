@@ -23,6 +23,39 @@ export interface ProofBundle {
   received_at: string;
   steps: ProofStep[];
   bundle_root_hash: string;
+  cdm_eligibility_assessment?: {
+    status: "eligible" | "ineligible" | "indeterminate_missing_evidence" | "indeterminate_conflicting_evidence" | "technical_error";
+    evaluated_at: string;
+    specification: Record<string, unknown>;
+    query?: Record<string, string>;
+    query_hash?: string;
+    evidence_lineage_hash?: string;
+    evidence_lineage?: Record<string, Array<Record<string, unknown>>>;
+    missing_fields?: string[];
+    conflicting_fields?: string[];
+    cdm_function?: {
+      function_name: string;
+      model_name: string;
+      model_version: string;
+      runtime: string;
+    };
+    verification?: {
+      verified: boolean;
+      reason?: string;
+      key_id?: string;
+      algorithm?: string;
+      content_hash?: string;
+      signature?: string;
+    };
+    check_eligibility_result?: {
+      isEligible: boolean;
+      matchingEligibleCriteria: unknown[];
+      eligibilityQuery: Record<string, unknown>;
+      specification: Record<string, unknown>;
+    };
+    error_code?: string;
+    error_message?: string;
+  };
 }
 
 export interface DecisionRecord {
