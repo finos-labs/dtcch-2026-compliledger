@@ -483,7 +483,9 @@ export async function evaluateEvidenceBackedCollateralEligibility(
 
   let provider: CollateralEligibilityProvider | null;
   try {
-    provider = options.provider ?? options.providerFactory?.() ?? createCollateralEligibilityProvider();
+    provider = Object.prototype.hasOwnProperty.call(options, "provider")
+      ? options.provider ?? null
+      : options.providerFactory?.() ?? createCollateralEligibilityProvider();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "CDM provider configuration failed";
     const code = error instanceof CdmEligibilityProviderError ? error.code : "cdm_provider_configuration_error";

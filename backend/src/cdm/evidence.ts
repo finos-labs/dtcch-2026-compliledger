@@ -416,8 +416,12 @@ export function prepareEligibilityEvidence(
     || left.message.localeCompare(right.message)
   );
 
-  const evidenceLineageHash = ELIGIBILITY_QUERY_FIELDS.some((field) => evidenceLineage[field].length > 0)
-    ? sha256(canonicalStringify(evidenceLineage))
+  const evidenceLineageHash = submittedEvidence.length > 0
+    ? sha256(canonicalStringify({
+      evidence_lineage: evidenceLineage,
+      rejected_evidence: sortedRejectedEvidence,
+      submitted_evidence: submittedEvidence,
+    }))
     : null;
   const query = dedupedConflictingFields.length === 0 && sortedMissingFields.length === 0
     ? queryCandidate

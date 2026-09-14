@@ -267,15 +267,21 @@ await test("MANUAL_REVIEW on conflicting evidence, duplicate IDs, and collateral
 });
 
 await test("NOT_EVALUABLE when provider is absent or throws configuration/runtime errors", async () => {
+  let fallbackFactoryCalled = false;
   const unconfigured = await evaluateEvidenceBackedCollateralEligibility(makeRequest(), {
     evaluatedAt: FIXED_EVALUATED_AT,
     provider: null,
+    providerFactory() {
+      fallbackFactoryCalled = true;
+      throw new Error("should not be called");
+    },
   });
   assert.equal(unconfigured.status, "NOT_EVALUABLE");
   assert.deepEqual(unconfigured.reason_codes, [
     "CDM_EVALUATION_UNAVAILABLE",
     "PROVIDER_NOT_CONFIGURED",
   ]);
+  assert.equal(fallbackFactoryCalled, false);
 
   const thrown = await evaluateEvidenceBackedCollateralEligibility(makeRequest(), {
     evaluatedAt: FIXED_EVALUATED_AT,
@@ -374,6 +380,34 @@ await test("specification reference-only requests need a resolver and determinis
   });
   assert.equal(resolvedOnce.assessment_id, resolvedTwice.assessment_id);
   assert.deepEqual(resolvedOnce.reason_codes, resolvedTwice.reason_codes);
+});
+
+await test("lineage hash changes when rejected evidence changes", async () => {
+  const clean = await evaluateEvidenceBackedCollateralEligibility(makeRequest(), {
+    evaluatedAt: FIXED_EVALUATED_AT,
+    provider: {
+      async evaluateEligibility() {
+        return makeResponse(true);
+      },
+    },
+  });
+  const withRejectedEvidence = await evaluateEvidenceBackedCollateralEligibility(makeRequest({
+    evidence_package: makeEvidencePackage({
+      evidence: [
+        ...makeEvidencePackage().evidence,
+        makeEvidence("issuerName", " ", { evidence_id: "bad-issuer-name" }),
+      ],
+    }),
+  }), {
+    evaluatedAt: FIXED_EVALUATED_AT,
+    provider: {
+      async evaluateEligibility() {
+        throw new Error("should not be called");
+      },
+    },
+  });
+
+  assert.notEqual(clean.evidence_lineage_hash, withRejectedEvidence.evidence_lineage_hash);
 });
 
 if (!process.exitCode) {
