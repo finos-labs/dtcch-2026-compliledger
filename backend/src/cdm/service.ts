@@ -56,6 +56,10 @@ export interface EvaluateEvidenceBackedCollateralEligibilityOptions {
 }
 
 function cloneJson<T>(value: T): T {
+  const clone = (globalThis as typeof globalThis & {
+    structuredClone?: <TValue>(input: TValue) => TValue;
+  }).structuredClone;
+  if (clone) return clone(value);
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
@@ -129,7 +133,7 @@ async function resolveSpecification(
   if (!specificationReference) {
     diagnostics.push(
       createDiagnostic(
-        "EVIDENCE_MISSING",
+        "SPECIFICATION_UNRESOLVED",
         "Eligible collateral specification payload or specification_reference is required"
       )
     );

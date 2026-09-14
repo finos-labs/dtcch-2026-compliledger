@@ -200,6 +200,28 @@ await test("NOT_EVALUABLE on missing and invalid evidence never calls provider",
   assert.ok(assessment.rejected_evidence?.some((entry) => entry.evidence_id === "blank-claim"));
 });
 
+await test("omitted evidence arrays are treated as missing evidence, not malformed input", async () => {
+  const assessment = await evaluateEvidenceBackedCollateralEligibility(makeRequest({
+    evidence_package: {
+      package_id: "pkg-empty",
+      collateral_reference: "COLL-001",
+    },
+  }), {
+    evaluatedAt: FIXED_EVALUATED_AT,
+    provider: {
+      async evaluateEligibility() {
+        throw new Error("should not be called");
+      },
+    },
+  });
+
+  assert.equal(assessment.status, "NOT_EVALUABLE");
+  assert.deepEqual(assessment.reason_codes, [
+    "EVIDENCE_MISSING",
+    "EVIDENCE_INSUFFICIENT",
+  ]);
+});
+
 await test("NOT_EVALUABLE flags stale boundary and future timestamps deterministically", async () => {
   const calls = [];
   const provider = {
@@ -381,6 +403,26 @@ await test("specification reference-only requests need a resolver and determinis
   });
   assert.equal(resolvedOnce.assessment_id, resolvedTwice.assessment_id);
   assert.deepEqual(resolvedOnce.reason_codes, resolvedTwice.reason_codes);
+});
+
+await test("missing specification input is classified as unresolved specification", async () => {
+  const assessment = await evaluateEvidenceBackedCollateralEligibility(makeRequest({
+    specification: undefined,
+    specification_reference: undefined,
+  }), {
+    evaluatedAt: FIXED_EVALUATED_AT,
+    provider: {
+      async evaluateEligibility() {
+        throw new Error("should not be called");
+      },
+    },
+  });
+
+  assert.equal(assessment.status, "NOT_EVALUABLE");
+  assert.deepEqual(assessment.reason_codes, [
+    "EVIDENCE_INSUFFICIENT",
+    "SPECIFICATION_UNRESOLVED",
+  ]);
 });
 
 await test("specification reference mismatches require manual review", async () => {

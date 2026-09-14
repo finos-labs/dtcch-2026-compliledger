@@ -22,6 +22,10 @@ const DEFAULT_POLICY: CdmEligibilityEvidencePolicy = Object.freeze({
 });
 
 function cloneJson<T>(value: T): T {
+  const clone = (globalThis as typeof globalThis & {
+    structuredClone?: <TValue>(input: TValue) => TValue;
+  }).structuredClone;
+  if (clone) return clone(value);
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
@@ -162,7 +166,7 @@ function resolveSubmittedEvidence(request: CdmEligibilityRequest): {
   const rawEvidence = Array.isArray(request.evidence_package.evidence)
     ? request.evidence_package.evidence
     : [];
-  if (!Array.isArray(request.evidence_package.evidence)) {
+  if ("evidence" in request.evidence_package && !Array.isArray(request.evidence_package.evidence)) {
     const message = "evidence_package.evidence must be an array";
     addDiagnostic(diagnostics, { reason_code: "EVIDENCE_INVALID", message });
     rejectedEvidence.push(
