@@ -3,7 +3,7 @@ import type {
 } from "./types";
 import { ExternalCdmEligibilityProvider } from "./httpAdapter";
 import { MockCdmEligibilityProvider } from "./mockProvider";
-import type { CollateralEligibilityProvider } from "./provider";
+import { CdmEligibilityProviderError, type CollateralEligibilityProvider } from "./provider";
 
 function parseMockResultFromEnv():
   | { defaultResult: CdmEligibilityEvaluationResponse["result"] }
@@ -26,6 +26,12 @@ export function createCollateralEligibilityProvider(): CollateralEligibilityProv
   const providerType = (process.env.CDM_ELIGIBILITY_PROVIDER || "").trim().toLowerCase();
   if (providerType === "mock") {
     return new MockCdmEligibilityProvider(parseMockResultFromEnv());
+  }
+  if (providerType && providerType !== "external") {
+    throw new CdmEligibilityProviderError(
+      "invalid_provider_configuration",
+      `Unsupported CDM_ELIGIBILITY_PROVIDER: ${process.env.CDM_ELIGIBILITY_PROVIDER}`
+    );
   }
 
   const endpoint = process.env.CDM_ELIGIBILITY_ENDPOINT;

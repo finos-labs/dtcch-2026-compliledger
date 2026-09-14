@@ -409,7 +409,7 @@ async function main() {
     });
 
     if (process.env.CDM_EXPECT_UNVERIFIED === "true") {
-      await test("CDM unverified response is recorded without inferring provider failure", async () => {
+      await test("CDM unverified response gate → technical_error", async () => {
         const { status, body } = await POST("/v1/intents", {
           asset_type: "stablecoin",
           issuer_name: "CDM Unverified Issuer",
@@ -422,10 +422,8 @@ async function main() {
           cdm_eligibility_request: cdmRequestBase,
         });
         eq(status, 201, "HTTP status");
-        assert(
-          ["eligible", "ineligible"].includes(body.bundle.cdm_eligibility_assessment.status),
-          `assessment status should be eligible/ineligible, got ${body.bundle.cdm_eligibility_assessment.status}`
-        );
+        eq(body.bundle.cdm_eligibility_assessment.status, "technical_error", "assessment status");
+        eq(body.bundle.cdm_eligibility_assessment.error_code, "unverified_cdm_response", "error_code");
         eq(body.bundle.cdm_eligibility_assessment.verification.verified, false, "verification.verified");
       });
     }

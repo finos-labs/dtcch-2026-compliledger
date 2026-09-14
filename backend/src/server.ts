@@ -142,19 +142,18 @@ async function resolveCdmEligibilityAssessment(
     return buildCdmEligibilityAssessment({ request, preparedEvidence });
   }
 
-  const cdmEligibilityProvider = createCollateralEligibilityProvider();
-  if (!cdmEligibilityProvider) {
-    return buildCdmEligibilityAssessment({
-      request,
-      preparedEvidence,
-      technicalError: {
-        code: "cdm_provider_not_configured",
-        message: "CDM collateral eligibility provider is not configured",
-      },
-    });
-  }
-
   try {
+    const cdmEligibilityProvider = createCollateralEligibilityProvider();
+    if (!cdmEligibilityProvider) {
+      return buildCdmEligibilityAssessment({
+        request,
+        preparedEvidence,
+        technicalError: {
+          code: "cdm_provider_not_configured",
+          message: "CDM collateral eligibility provider is not configured",
+        },
+      });
+    }
     const cdmResponse = await cdmEligibilityProvider.evaluateEligibility(
       request.specification,
       preparedEvidence.query

@@ -18,6 +18,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasResultFields(value: Record<string, unknown>): boolean {
+  return "isEligible" in value
+    && "matchingEligibleCriteria" in value
+    && "eligibilityQuery" in value
+    && "specification" in value;
+}
+
 interface ExternalCdmEligibilityProviderOptions {
   url: string;
   authToken?: string;
@@ -141,10 +148,10 @@ export class ExternalCdmEligibilityProvider implements CollateralEligibilityProv
   }
 
   private extractEligibilityResult(payload: unknown): CheckEligibilityResult {
-    if (isRecord(payload) && isRecord(payload.result)) {
+    if (isRecord(payload) && isRecord(payload.result) && hasResultFields(payload.result)) {
       return payload.result as unknown as CheckEligibilityResult;
     }
-    if (isRecord(payload)) {
+    if (isRecord(payload) && hasResultFields(payload)) {
       return payload as unknown as CheckEligibilityResult;
     }
     throw new CdmEligibilityProviderError(

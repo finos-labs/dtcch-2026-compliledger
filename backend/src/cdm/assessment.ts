@@ -65,6 +65,19 @@ export function buildCdmEligibilityAssessment(input: BuildAssessmentInput): CdmE
     };
   }
 
+  if (!input.cdmResponse.verification.verified) {
+    return {
+      status: "technical_error",
+      evaluated_at: evaluatedAt,
+      specification: input.request.specification,
+      ...base,
+      cdm_function: input.cdmResponse.metadata,
+      verification: input.cdmResponse.verification,
+      error_code: "unverified_cdm_response",
+      error_message: "CDM response verification failed",
+    };
+  }
+
   return {
     status: input.cdmResponse.result.isEligible ? "eligible" : "ineligible",
     evaluated_at: evaluatedAt,

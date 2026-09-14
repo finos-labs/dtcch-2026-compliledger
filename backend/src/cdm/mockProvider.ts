@@ -92,7 +92,7 @@ export class MockCdmEligibilityProvider implements CollateralEligibilityProvider
     }
 
     const verification: CdmVerificationMetadata = {
-      verified: false,
+      verified: true,
       reason: "test_reference_provider",
     };
 
