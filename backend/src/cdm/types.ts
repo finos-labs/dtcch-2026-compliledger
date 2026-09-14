@@ -7,6 +7,9 @@ export type EligibilityQueryField =
   | "issuerType"
   | "issuerName";
 
+export const CDM_COLLATERAL_ELIGIBILITY_FUNCTION =
+  "cdm.product.collateral.CheckEligibilityByDetails" as const;
+
 export interface EligibleCollateralSpecification {
   id?: string;
   name?: string;
@@ -14,7 +17,7 @@ export interface EligibleCollateralSpecification {
   criteria: Record<string, unknown>;
 }
 
-export interface EligibilityQuery {
+export interface CdmEligibilityQuery {
   maturity: string;
   collateralAssetType: string;
   assetCountryOfOrigin: string;
@@ -24,12 +27,16 @@ export interface EligibilityQuery {
   issuerName: string;
 }
 
-export interface CheckEligibilityResult {
+export type EligibilityQuery = CdmEligibilityQuery;
+
+export interface CdmEligibilityResult {
   isEligible: boolean;
   matchingEligibleCriteria: unknown[];
-  eligibilityQuery: EligibilityQuery;
+  eligibilityQuery: CdmEligibilityQuery;
   specification: EligibleCollateralSpecification;
 }
+
+export type CheckEligibilityResult = CdmEligibilityResult;
 
 export interface EvidenceReference {
   evidence_id: string;
@@ -56,12 +63,14 @@ export interface PreparedEligibilityEvidence {
   conflicting_fields: EligibilityQueryField[];
 }
 
-export interface CdmFunctionMetadata {
-  function_name: string;
-  model_name: string;
-  model_version: string;
-  runtime: string;
+export interface CdmProviderMetadata {
+  provider_name: string;
+  cdm_function: typeof CDM_COLLATERAL_ELIGIBILITY_FUNCTION;
+  cdm_model_version: string;
+  provider_version: string;
 }
+
+export type CdmFunctionMetadata = CdmProviderMetadata;
 
 export interface CdmVerificationMetadata {
   verified: boolean;
@@ -73,8 +82,8 @@ export interface CdmVerificationMetadata {
 }
 
 export interface CdmEligibilityEvaluationResponse {
-  result: CheckEligibilityResult;
-  metadata: CdmFunctionMetadata;
+  result: CdmEligibilityResult;
+  metadata: CdmProviderMetadata;
   verification: CdmVerificationMetadata;
 }
 

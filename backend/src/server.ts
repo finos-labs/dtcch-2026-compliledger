@@ -29,7 +29,8 @@ import { writeRegulatoryEvent, getRegulatoryEvents } from "./audit/regulatory-lo
 import { cantonCircuit, bedrockCircuit } from "./circuit-breaker";
 import type { CdmEligibilityAssessment, CdmEligibilityRequest } from "./cdm/types";
 import { prepareEligibilityEvidence } from "./cdm/evidence";
-import { createCdmEligibilityAdapter } from "./cdm/adapter";
+import { createCollateralEligibilityProvider } from "./cdm/adapter";
+import { CdmEligibilityProviderError } from "./cdm/provider";
 import { buildCdmEligibilityAssessment } from "./cdm/assessment";
 
 guardStartup();
@@ -141,31 +142,31 @@ async function resolveCdmEligibilityAssessment(
     return buildCdmEligibilityAssessment({ request, preparedEvidence });
   }
 
-  const cdmEligibilityAdapter = createCdmEligibilityAdapter();
-  if (!cdmEligibilityAdapter) {
-    return buildCdmEligibilityAssessment({
-      request,
-      preparedEvidence,
-      technicalError: {
-        code: "cdm_adapter_not_configured",
-        message: "CDM eligibility adapter is not configured",
-      },
-    });
-  }
-
   try {
-    const cdmResponse = await cdmEligibilityAdapter.evaluate({
-      specification: request.specification,
-      query: preparedEvidence.query,
-    });
+    const cdmEligibilityProvider = createCollateralEligibilityProvider();
+    if (!cdmEligibilityProvider) {
+      return buildCdmEligibilityAssessment({
+        request,
+        preparedEvidence,
+        technicalError: {
+          code: "cdm_provider_not_configured",
+          message: "CDM collateral eligibility provider is not configured",
+        },
+      });
+    }
+    const cdmResponse = await cdmEligibilityProvider.evaluateEligibility(
+      request.specification,
+      preparedEvidence.query
+    );
     return buildCdmEligibilityAssessment({ request, preparedEvidence, cdmResponse });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown CDM adapter error";
+    const message = err instanceof Error ? err.message : "Unknown CDM eligibility provider error";
+    const code = err instanceof CdmEligibilityProviderError ? err.code : "cdm_provider_error";
     return buildCdmEligibilityAssessment({
       request,
       preparedEvidence,
       technicalError: {
-        code: "cdm_adapter_error",
+        code,
         message,
       },
     });

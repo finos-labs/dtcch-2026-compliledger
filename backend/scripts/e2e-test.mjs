@@ -423,7 +423,7 @@ async function main() {
         });
         eq(status, 201, "HTTP status");
         eq(body.bundle.cdm_eligibility_assessment.status, "technical_error", "assessment status");
-        eq(body.bundle.cdm_eligibility_assessment.error_code, "unverified_cdm_response", "error_code");
+        eq(body.bundle.cdm_eligibility_assessment.error_code, "unverified_provider_response", "error_code");
       });
     }
   } else {

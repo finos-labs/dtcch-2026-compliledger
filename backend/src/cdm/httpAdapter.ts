@@ -8,6 +8,8 @@ import type {
   EligibilityQuery,
   EligibleCollateralSpecification,
 } from "./types";
+import { CDM_COLLATERAL_ELIGIBILITY_FUNCTION } from "./types";
+import { CdmEligibilityProviderError, type CollateralEligibilityProvider } from "./provider";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 const SUPPORTED_RESPONSE_ALGORITHM = "hmac-sha256";
@@ -16,65 +18,133 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export class HttpCdmEligibilityAdapter {
-  private readonly endpoint: string;
+function hasResultFields(value: Record<string, unknown>): boolean {
+  return "isEligible" in value
+    && "matchingEligibleCriteria" in value
+    && "eligibilityQuery" in value
+    && "specification" in value;
+}
 
-  constructor(endpoint: string) {
-    this.endpoint = endpoint;
+interface ExternalCdmEligibilityProviderOptions {
+  url: string;
+  authToken?: string;
+  authHeader?: string;
+  timeoutMs?: number;
+  providerName?: string;
+  providerVersion?: string;
+  cdmModelVersion?: string;
+}
+
+export class ExternalCdmEligibilityProvider implements CollateralEligibilityProvider {
+  private readonly url: string;
+  private readonly authToken?: string;
+  private readonly authHeader?: string;
+  private readonly timeoutMs: number;
+  private readonly providerName: string;
+  private readonly providerVersion: string;
+  private readonly cdmModelVersion: string;
+
+  constructor(options: ExternalCdmEligibilityProviderOptions) {
+    this.url = options.url;
+    this.authToken = options.authToken;
+    this.authHeader = options.authHeader;
+    this.timeoutMs = Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : DEFAULT_TIMEOUT_MS;
+    this.providerName = options.providerName || "External CDM Eligibility Provider";
+    this.providerVersion = options.providerVersion || "unknown";
+    this.cdmModelVersion = options.cdmModelVersion || "unknown";
   }
 
-  async evaluate(input: {
-    specification: EligibleCollateralSpecification;
-    query: EligibilityQuery;
-  }): Promise<CdmEligibilityEvaluationResponse> {
-    const timeoutMs = Number(process.env.CDM_ELIGIBILITY_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  async evaluateEligibility(
+    specification: EligibleCollateralSpecification,
+    query: EligibilityQuery
+  ): Promise<CdmEligibilityEvaluationResponse> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS);
-
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
     const body = {
-      function: "CheckEligibilityByDetails",
-      specification: input.specification,
-      query: input.query,
+      cdm_function: CDM_COLLATERAL_ELIGIBILITY_FUNCTION,
+      specification,
+      eligibilityQuery: query,
     };
 
+    let response: Response;
+
     try {
-      const response = await fetch(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(process.env.CDM_ELIGIBILITY_AUTH_TOKEN
-            ? { Authorization: ["Bearer", process.env.CDM_ELIGIBILITY_AUTH_TOKEN].join(" ") }
-            : {}),
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+      try {
+        response = await fetch(this.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(this.authHeader ? { Authorization: this.authHeader } : {}),
+            ...(!this.authHeader && this.authToken
+              ? { Authorization: ["Bearer", this.authToken].join(" ") }
+              : {}),
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") {
+          throw new CdmEligibilityProviderError(
+            "provider_timeout",
+            `CDM provider request timed out after ${this.timeoutMs}ms`
+          );
+        }
+        const message = err instanceof Error ? err.message : "Unknown provider connectivity error";
+        throw new CdmEligibilityProviderError("provider_unavailable", message);
+      }
 
       if (!response.ok) {
         const text = await response.text().catch(() => "");
-        throw new Error(`CDM eligibility endpoint error (${response.status}): ${text || response.statusText}`);
+        const code = response.status === 401 || response.status === 403
+          ? "provider_auth_error"
+          : "provider_http_error";
+        throw new CdmEligibilityProviderError(
+          code,
+          `CDM eligibility endpoint error (${response.status}): ${text || response.statusText}`
+        );
       }
 
-      const payload = await response.json() as {
-        result: CheckEligibilityResult;
-        metadata?: Partial<CdmFunctionMetadata>;
-      };
-
-      if (!payload || typeof payload !== "object" || !payload.result || typeof payload.result !== "object") {
-        throw new Error("CDM eligibility endpoint returned invalid payload shape");
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new CdmEligibilityProviderError(
+          "invalid_provider_response",
+          "CDM eligibility endpoint returned invalid JSON"
+        );
       }
-      this.assertValidEligibilityResult(payload.result);
+
+      const result = this.extractEligibilityResult(payload);
+      this.assertValidEligibilityResult(result);
 
       const verification = this.verifyResponse(response.headers, payload);
+      if (!verification.verified) {
+        throw new CdmEligibilityProviderError(
+          "unverified_provider_response",
+          `CDM response verification failed${verification.reason ? `: ${verification.reason}` : ""}`
+        );
+      }
       const metadata: CdmFunctionMetadata = {
-        function_name: payload.metadata?.function_name || "CheckEligibilityByDetails",
-        model_name: payload.metadata?.model_name || "FINOS-CDM",
-        model_version: payload.metadata?.model_version || "unknown",
-        runtime: payload.metadata?.runtime || "external-http",
+        provider_name: this.providerName,
+        cdm_function: CDM_COLLATERAL_ELIGIBILITY_FUNCTION,
+        cdm_model_version: this.cdmModelVersion,
+        provider_version: this.providerVersion,
       };
 
+      if (isRecord(payload) && isRecord(payload.metadata)) {
+        if (typeof payload.metadata.provider_name === "string") {
+          metadata.provider_name = payload.metadata.provider_name;
+        }
+        if (typeof payload.metadata.cdm_model_version === "string") {
+          metadata.cdm_model_version = payload.metadata.cdm_model_version;
+        }
+        if (typeof payload.metadata.provider_version === "string") {
+          metadata.provider_version = payload.metadata.provider_version;
+        }
+      }
+
       return {
-        result: payload.result,
+        result,
         metadata,
         verification,
       };
@@ -83,30 +153,32 @@ export class HttpCdmEligibilityAdapter {
     }
   }
 
+  private extractEligibilityResult(payload: unknown): CheckEligibilityResult {
+    if (isRecord(payload) && isRecord(payload.result) && hasResultFields(payload.result)) {
+      return payload.result as unknown as CheckEligibilityResult;
+    }
+    if (isRecord(payload) && hasResultFields(payload)) {
+      return payload as unknown as CheckEligibilityResult;
+    }
+    throw new CdmEligibilityProviderError(
+      "invalid_provider_response",
+      "CDM eligibility endpoint returned invalid payload shape"
+    );
+  }
+
   private verifyResponse(
     headers: Headers,
-    payload: { result: CheckEligibilityResult; metadata?: Partial<CdmFunctionMetadata> }
+    payload: unknown
   ): CdmVerificationMetadata {
     const signature = headers.get("x-cdm-response-signature") || "";
     const keyId = headers.get("x-cdm-response-key-id") || undefined;
     const algorithm = headers.get("x-cdm-response-algorithm") || SUPPORTED_RESPONSE_ALGORITHM;
     const contentHash = sha256(canonicalStringify(payload));
 
-    if (algorithm !== SUPPORTED_RESPONSE_ALGORITHM) {
+    if (!process.env.CDM_RESPONSE_HMAC_SECRET) {
       return {
         verified: false,
-        reason: "unsupported_algorithm",
-        key_id: keyId,
-        algorithm,
-        content_hash: contentHash,
-      };
-    }
-
-    const sharedSecret = process.env.CDM_RESPONSE_HMAC_SECRET;
-    if (!sharedSecret) {
-      return {
-        verified: false,
-        reason: "missing_verification_secret",
+        reason: "verification_not_configured",
         key_id: keyId,
         algorithm,
         content_hash: contentHash,
@@ -123,6 +195,17 @@ export class HttpCdmEligibilityAdapter {
       };
     }
 
+    if (algorithm !== SUPPORTED_RESPONSE_ALGORITHM) {
+      return {
+        verified: false,
+        reason: "unsupported_algorithm",
+        key_id: keyId,
+        algorithm,
+        content_hash: contentHash,
+        signature,
+      };
+    }
+
     if (!/^[a-f0-9]+$/i.test(signature) || signature.length % 2 !== 0) {
       return {
         verified: false,
@@ -134,7 +217,9 @@ export class HttpCdmEligibilityAdapter {
       };
     }
 
-    const expected = createHmac("sha256", sharedSecret).update(contentHash, "utf8").digest("hex");
+    const expected = createHmac("sha256", process.env.CDM_RESPONSE_HMAC_SECRET)
+      .update(contentHash, "utf8")
+      .digest("hex");
     const expectedBuffer = Buffer.from(expected, "hex");
     const signatureBuffer = Buffer.from(signature, "hex");
     const signatureMatches = expectedBuffer.length === signatureBuffer.length
@@ -161,16 +246,28 @@ export class HttpCdmEligibilityAdapter {
 
   private assertValidEligibilityResult(result: CheckEligibilityResult): void {
     if (typeof result.isEligible !== "boolean") {
-      throw new Error("CDM eligibility endpoint result.isEligible must be boolean");
+      throw new CdmEligibilityProviderError(
+        "invalid_provider_response",
+        "CDM eligibility endpoint result.isEligible must be boolean"
+      );
     }
     if (!Array.isArray(result.matchingEligibleCriteria)) {
-      throw new Error("CDM eligibility endpoint result.matchingEligibleCriteria must be an array");
+      throw new CdmEligibilityProviderError(
+        "invalid_provider_response",
+        "CDM eligibility endpoint result.matchingEligibleCriteria must be an array"
+      );
     }
     if (!isRecord(result.eligibilityQuery)) {
-      throw new Error("CDM eligibility endpoint result.eligibilityQuery must be an object");
+      throw new CdmEligibilityProviderError(
+        "invalid_provider_response",
+        "CDM eligibility endpoint result.eligibilityQuery must be an object"
+      );
     }
     if (!isRecord(result.specification)) {
-      throw new Error("CDM eligibility endpoint result.specification must be an object");
+      throw new CdmEligibilityProviderError(
+        "invalid_provider_response",
+        "CDM eligibility endpoint result.specification must be an object"
+      );
     }
     for (const field of [
       "maturity",
@@ -182,8 +279,17 @@ export class HttpCdmEligibilityAdapter {
       "issuerName",
     ]) {
       if (typeof (result.eligibilityQuery as Record<string, unknown>)[field] !== "string") {
-        throw new Error(`CDM eligibility endpoint result.eligibilityQuery.${field} must be string`);
+        throw new CdmEligibilityProviderError(
+          "invalid_provider_response",
+          `CDM eligibility endpoint result.eligibilityQuery.${field} must be string`
+        );
       }
     }
+  }
+}
+
+export class HttpCdmEligibilityAdapter extends ExternalCdmEligibilityProvider {
+  constructor(endpoint: string) {
+    super({ url: endpoint });
   }
 }

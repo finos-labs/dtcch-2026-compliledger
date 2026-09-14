@@ -20,13 +20,13 @@ if (!SHARED_SECRET) {
 }
 
 const body = {
-  function: "CheckEligibilityByDetails",
+  cdm_function: "cdm.product.collateral.CheckEligibilityByDetails",
   specification: {
     id: "SPEC-INT-001",
     version: "1.0",
     criteria: { market: "GMSLA" },
   },
-  query: {
+  eligibilityQuery: {
     maturity: "2028-12-31",
     collateralAssetType: "GOVERNMENT_BOND",
     assetCountryOfOrigin: "US",
@@ -53,6 +53,7 @@ if (!response.ok) {
 }
 
 const payload = await response.json();
+const result = payload?.result ?? payload;
 const signature = response.headers.get("x-cdm-response-signature") || "";
 const contentHash = sha256(canonicalStringify(payload));
 const expected = createHmac("sha256", SHARED_SECRET).update(contentHash, "utf8").digest("hex");
@@ -62,13 +63,13 @@ if (!signature || signature !== expected) {
   process.exit(1);
 }
 
-if (!payload?.result || typeof payload.result.isEligible !== "boolean") {
+if (!result || typeof result.isEligible !== "boolean") {
   console.error("CDM response did not include a valid CheckEligibilityResult");
   process.exit(1);
 }
 
 for (const key of ["eligibilityQuery", "specification", "matchingEligibleCriteria"]) {
-  if (!(key in payload.result)) {
+  if (!(key in result)) {
     console.error(`CDM response missing result.${key}`);
     process.exit(1);
   }
