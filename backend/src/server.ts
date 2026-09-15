@@ -29,12 +29,18 @@ import { writeRegulatoryEvent, getRegulatoryEvents } from "./audit/regulatory-lo
 import { cantonCircuit, bedrockCircuit } from "./circuit-breaker";
 import type { CdmEligibilityAssessment, CdmEligibilityRequest } from "./cdm/types";
 import { evaluateEvidenceBackedCollateralEligibility } from "./cdm/service";
+import {
+  parseCdmEligibilityEvaluationApiRequest,
+  toCdmEligibilityEvaluationApiResponse,
+  toInternalCdmEligibilityRequest,
+} from "./cdm/http";
 
 guardStartup();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || "32kb";
+const CDM_ELIGIBILITY_ROUTE_PATH = "/v1/cdm/collateral/eligibility/evaluate";
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
@@ -54,6 +60,21 @@ app.use(
 );
 
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
+
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if ((req.path === CDM_ELIGIBILITY_ROUTE_PATH || req.originalUrl === CDM_ELIGIBILITY_ROUTE_PATH)
+    && typeof err === "object"
+    && err
+    && "type" in err
+    && (err as { type?: string }).type === "entity.parse.failed") {
+    res.status(400).json({
+      error: "Malformed JSON request body",
+      validation_errors: [{ path: "$", message: "Request body must be valid JSON" }],
+    });
+    return;
+  }
+  next(err);
+});
 
 app.use((req: AuthenticatedRequest, _res, next) => {
   (req as AuthenticatedRequest & { correlationId: string }).correlationId =
@@ -75,6 +96,7 @@ app.use("/v1/attestations", postRateLimiter);
 app.use("/v1/reasoning", postRateLimiter);
 app.use("/v1/demo/evaluate", postRateLimiter);
 app.use("/v1/audit", postRateLimiter);
+app.use(CDM_ELIGIBILITY_ROUTE_PATH, postRateLimiter);
 
 // Auth + route-level scopes.
 // Static API_BEARER_TOKEN clients are granted `sg:admin` (wildcard) so the
@@ -87,6 +109,7 @@ app.get("/v1/intents/:id", requireAuth, requireScope("sg:intents:read"));
 app.post("/v1/verify", requireAuth, requireScope("sg:verify:read"));
 app.post("/v1/attestations/:id/anchor", requireAuth, requireScope("sg:attestations:write"));
 app.post("/v1/reasoning/:id", requireAuth, requireScope("sg:reasoning:read"));
+app.post(CDM_ELIGIBILITY_ROUTE_PATH, requireAuth, requireScope("sg:cdm:eligibility:evaluate"));
 app.post("/v1/demo/evaluate", requireAuth, requireScope("sg:demo:evaluate"));
 
 /** Extract and run an optional OSS rule evaluation from a request body. */
@@ -501,6 +524,22 @@ app.get("/v1/canton/commitments/:attestationHash", async (req, res) => {
     console.error("Canton lookup error:", err);
     res.status(500).json({ error: "Canton lookup failed" });
   }
+});
+
+// POST /v1/demo/evaluate — Evaluate a payload against a rule pack
+app.post(CDM_ELIGIBILITY_ROUTE_PATH, async (req, res) => {
+  const validation = parseCdmEligibilityEvaluationApiRequest(req.body);
+  if (!validation.ok) {
+    res.status(400).json({
+      error: "Invalid CDM collateral eligibility evaluation request",
+      validation_errors: validation.errors,
+    });
+    return;
+  }
+
+  const request = toInternalCdmEligibilityRequest(validation.request);
+  const assessment = await evaluateEvidenceBackedCollateralEligibility(request);
+  res.status(200).json(toCdmEligibilityEvaluationApiResponse(assessment));
 });
 
 // POST /v1/demo/evaluate — Evaluate a payload against a rule pack
