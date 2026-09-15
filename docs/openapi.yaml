@@ -237,14 +237,6 @@ paths:
                 summary: Provider-evaluable request
                 value:
                   collateral_reference: COLL-UST-001
-                  collateral_details:
-                    maturity: "2028-12-31"
-                    collateralAssetType: GOVERNMENT_BOND
-                    assetCountryOfOrigin: US
-                    denominatedCurrency: USD
-                    agencyRating: AA
-                    issuerType: SOVEREIGN
-                    issuerName: US TREASURY
                   specification:
                     id: SPEC-GMSLA-2026
                     name: GMSLA Eligible Collateral
@@ -362,24 +354,6 @@ components:
         criteria:
           type: object
           additionalProperties: true
-    CollateralDetails:
-      type: object
-      properties:
-        maturity:
-          type: string
-        collateralAssetType:
-          type: string
-        assetCountryOfOrigin:
-          type: string
-        denominatedCurrency:
-          type: string
-        agencyRating:
-          type: string
-        issuerType:
-          type: string
-        issuerName:
-          type: string
-      description: Informational context only; the eligibility query is derived from accepted evidence, not from this object.
     EvidenceReference:
       type: object
       required:
@@ -431,8 +405,6 @@ components:
       properties:
         collateral_reference:
           type: string
-        collateral_details:
-          $ref: '#/components/schemas/CollateralDetails'
         specification:
           $ref: '#/components/schemas/EligibleCollateralSpecification'
         specification_reference:
@@ -446,7 +418,7 @@ components:
           type: string
         reference:
           type: string
-    CdmEligibilityResultSummary:
+    CdmEligibilityAssessmentResultSummary:
       type: object
       required: [isEligible, matching_criteria]
       properties:
@@ -472,7 +444,7 @@ components:
           nullable: true
     EvidenceReferenceDiagnostic:
       type: object
-      required: [evidence_id, field, reason_codes, message, evidence]
+      required: [reason_codes, message, evidence]
       properties:
         evidence_id:
           type: string
@@ -791,7 +763,7 @@ components:
           nullable: true
         cdm_result_summary:
           allOf:
-            - $ref: '#/components/schemas/CdmEligibilityResultSummary'
+            - $ref: '#/components/schemas/CdmEligibilityAssessmentResultSummary'
           nullable: true
         matching_criteria_summary:
           type: array

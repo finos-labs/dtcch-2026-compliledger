@@ -705,8 +705,6 @@ transaction, issue an attestation, anchor to Canton, or call the Bedrock reasoni
   `cdm_eligibility_request` wrapper.
 - `collateral_reference`, either `specification` or `specification_reference`, and
   `evidence_package.evidence` are required at the HTTP boundary.
-- `collateral_details` is optional context only. SettlementGuard does **not** trust it to populate
-  the `EligibilityQuery`, satisfy evidence sufficiency, or override evidence-backed claims.
 - Provider selection remains server-configured through environment variables. The route does **not**
   accept per-request provider URLs, credentials, or provider configuration IDs.
 - If both `specification` and `specification_reference` are supplied, `specification_reference`
@@ -729,15 +727,6 @@ Example — sufficient evidence, provider-evaluable:
 ```json
 {
   "collateral_reference": "COLL-UST-001",
-  "collateral_details": {
-    "maturity": "2028-12-31",
-    "collateralAssetType": "GOVERNMENT_BOND",
-    "assetCountryOfOrigin": "US",
-    "denominatedCurrency": "USD",
-    "agencyRating": "AA",
-    "issuerType": "SOVEREIGN",
-    "issuerName": "US TREASURY"
-  },
   "specification": {
     "id": "SPEC-GMSLA-2026",
     "name": "GMSLA Eligible Collateral",

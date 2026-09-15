@@ -85,7 +85,6 @@ function makeEvidencePackage(overrides = {}) {
 function makeRequest(overrides = {}) {
   return {
     collateral_reference: "COLL-001",
-    collateral_details: { ...baseEvidenceValues },
     specification: { ...baseSpecification },
     specification_reference: baseSpecification.id,
     evidence_package: makeEvidencePackage(),

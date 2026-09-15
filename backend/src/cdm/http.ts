@@ -20,19 +20,8 @@ const EVIDENCE_SUFFICIENCY_REASON_CODES: readonly CdmEligibilityAssessmentReason
   "EVIDENCE_CONFLICT",
 ] as const;
 
-const COLLATERAL_DETAIL_FIELDS: readonly EligibilityQueryField[] = [
-  "maturity",
-  "collateralAssetType",
-  "assetCountryOfOrigin",
-  "denominatedCurrency",
-  "agencyRating",
-  "issuerType",
-  "issuerName",
-] as const;
-
 export interface CdmEligibilityEvaluationApiRequest {
   collateral_reference: string;
-  collateral_details?: Partial<Record<EligibilityQueryField, string>>;
   specification?: EligibleCollateralSpecification;
   specification_reference?: string;
   evidence_package: {
@@ -143,16 +132,6 @@ export function parseCdmEligibilityEvaluationApiRequest(
 
   if (typeof body.collateral_reference !== "string") {
     pushError(errors, "collateral_reference", "collateral_reference is required and must be a string");
-  }
-
-  if (body.collateral_details !== undefined) {
-    if (!isPlainObject(body.collateral_details)) {
-      pushError(errors, "collateral_details", "collateral_details must be an object when provided");
-    } else {
-      for (const field of COLLATERAL_DETAIL_FIELDS) {
-        validateOptionalString(body.collateral_details[field], `collateral_details.${field}`, errors);
-      }
-    }
   }
 
   if (body.specification === undefined && body.specification_reference === undefined) {
