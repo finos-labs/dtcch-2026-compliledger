@@ -355,7 +355,7 @@ try {
     assert.equal(response.body.provider_version, "fixture-provider-v1");
     assert.equal(response.body.cdm_model_version, "cdm-fixture-v1");
     assert.equal(response.body.cdm_result_summary.isEligible, true);
-    assert.deepEqual(response.body.matching_criteria_summary, [
+    assert.deepEqual(response.body.cdm_result_summary.matching_criteria, [
       { reference: "criteria/1" },
       { identifier: "CRIT-2", reference: "criteria/2" },
     ]);

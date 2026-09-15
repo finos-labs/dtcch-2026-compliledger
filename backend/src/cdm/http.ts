@@ -7,7 +7,6 @@ import type {
   EligibilityQueryField,
   EligibleCollateralSpecification,
   EvidenceReference,
-  MatchingEligibilityCriterionSummary,
 } from "./types";
 
 const EVIDENCE_SUFFICIENCY_REASON_CODES: readonly CdmEligibilityAssessmentReasonCode[] = [
@@ -80,7 +79,6 @@ export interface CdmEligibilityEvaluationApiResponse {
   evidence_policy: CdmEligibilityAssessment["evidence_policy"];
   verification: CdmEligibilityAssessment["verification"] | null;
   cdm_result_summary: CdmEligibilityResultSummary | null;
-  matching_criteria_summary: MatchingEligibilityCriterionSummary[] | null;
   check_eligibility_result: CdmEligibilityAssessment["check_eligibility_result"] | null;
   error_code: string | null;
   error_message: string | null;
@@ -312,7 +310,6 @@ export function toCdmEligibilityEvaluationApiResponse(
     evidence_policy: assessment.evidence_policy,
     verification: assessment.verification ?? null,
     cdm_result_summary: assessment.cdm_result_summary ?? null,
-    matching_criteria_summary: assessment.cdm_result_summary?.matching_criteria ?? null,
     check_eligibility_result: assessment.check_eligibility_result ?? null,
     error_code: assessment.error_code ?? null,
     error_message: assessment.error_message ?? null,

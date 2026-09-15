@@ -61,21 +61,6 @@ app.use(
 
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
-app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (req.path === CDM_ELIGIBILITY_ROUTE_PATH
-    && typeof err === "object"
-    && err
-    && "type" in err
-    && (err as { type?: string }).type === "entity.parse.failed") {
-    res.status(400).json({
-      error: "Malformed JSON request body",
-      validation_errors: [{ path: "$", message: "Request body must be valid JSON" }],
-    });
-    return;
-  }
-  next(err);
-});
-
 app.use((req: AuthenticatedRequest, _res, next) => {
   (req as AuthenticatedRequest & { correlationId: string }).correlationId =
     (req.headers["x-correlation-id"] as string) || uuidv4();
@@ -631,6 +616,21 @@ app.post("/v1/demo/evaluate", (req, res) => {
     console.error(`Evaluate error for rule_pack ${rule_pack}:`, err);
     res.status(500).json({ error: "Evaluation failed" });
   }
+});
+
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path === CDM_ELIGIBILITY_ROUTE_PATH
+    && typeof err === "object"
+    && err
+    && "type" in err
+    && (err as { type?: string }).type === "entity.parse.failed") {
+    res.status(400).json({
+      error: "Malformed JSON request body",
+      validation_errors: [{ path: "$", message: "Request body must be valid JSON" }],
+    });
+    return;
+  }
+  next(err);
 });
 
 // GET /health — Health check

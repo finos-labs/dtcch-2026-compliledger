@@ -428,6 +428,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MatchingEligibilityCriterionSummary'
+    EligibilityCriterion:
+      oneOf:
+        - type: string
+        - $ref: '#/components/schemas/MatchingEligibilityCriterionSummary'
     CdmEligibilityAssessmentDiagnostic:
       type: object
       required: [reason_code, message]
@@ -619,7 +623,8 @@ components:
           type: boolean
         matchingEligibleCriteria:
           type: array
-          items: {}
+          items:
+            $ref: '#/components/schemas/EligibilityCriterion'
         eligibilityQuery:
           $ref: '#/components/schemas/EligibilityQuery'
         specification:
@@ -658,7 +663,6 @@ components:
         - evidence_policy
         - verification
         - cdm_result_summary
-        - matching_criteria_summary
         - check_eligibility_result
         - error_code
         - error_message
@@ -766,11 +770,6 @@ components:
           allOf:
             - $ref: '#/components/schemas/CdmEligibilityAssessmentResultSummary'
           nullable: true
-        matching_criteria_summary:
-          type: array
-          nullable: true
-          items:
-            $ref: '#/components/schemas/MatchingEligibilityCriterionSummary'
         check_eligibility_result:
           allOf:
             - $ref: '#/components/schemas/CheckEligibilityResult'
