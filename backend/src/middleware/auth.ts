@@ -27,6 +27,7 @@ export type AuthScope =
   | "sg:anchor:write"
   | "sg:reasoning:read"
   | "sg:audit:read"
+  | "sg:cdm:eligibility:evaluate"
   | "sg:demo:evaluate"
   | "sg:admin";
 

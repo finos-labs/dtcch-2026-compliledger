@@ -21,6 +21,7 @@ tags:
   - name: reasoning
   - name: keys
   - name: canton
+  - name: cdm
   - name: demo
 
 paths:
@@ -202,5 +203,580 @@ paths:
               schema:
                 type: object
 
+  /v1/cdm/collateral/eligibility/evaluate:
+    post:
+      tags: [cdm]
+      summary: Evaluate evidence-backed CDM collateral eligibility
+      description: |
+        Returns a deterministic evidence-backed CDM collateral eligibility assessment.
+
+        This route is assessment-only: it does not create a transaction, submit an
+        intent, issue an attestation, anchor to Canton, or invoke the Bedrock
+        reasoning flow.
+
+        Authentication uses the same bearer/JWT model as the rest of the backend.
+        JWT clients must present the `sg:cdm:eligibility:evaluate` scope (or
+        `sg:admin`). Static `API_BEARER_TOKEN` clients are granted `sg:admin`.
+
+        The provider is server-configured. Per-request provider URLs, credentials,
+        and provider configuration IDs are not accepted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/CdmEligibilityEvaluationRequest'
+                - anyOf:
+                    - required: [specification]
+                    - required: [specification_reference]
+            examples:
+              sufficientEvidence:
+                summary: Provider-evaluable request
+                value:
+                  collateral_reference: COLL-UST-001
+                  specification:
+                    id: SPEC-GMSLA-2026
+                    name: GMSLA Eligible Collateral
+                    version: "1.0"
+                    criteria:
+                      schedule: fixture
+                  specification_reference: SPEC-GMSLA-2026
+                  evidence_package:
+                    package_id: pkg-eligibility-001
+                    collateral_reference: COLL-UST-001
+                    evidence:
+                      - evidence_id: ev-maturity-001
+                        source: issuer-feed
+                        attribute: maturity
+                        claim_value: "2028-12-31"
+                        observed_at: "2026-09-15T12:00:00Z"
+                        provenance: issuer-feed/v1
+                        integrity_hash: sha256:maturity-fixture
+              insufficientEvidence:
+                summary: Structurally valid but not evaluable
+                value:
+                  collateral_reference: COLL-UST-001
+                  specification_reference: SPEC-GMSLA-2026
+                  evidence_package:
+                    package_id: pkg-eligibility-empty
+                    collateral_reference: COLL-UST-001
+                    evidence: []
+      responses:
+        '200':
+          description: |
+            Assessment returned. `status` may be `SATISFIED`, `NOT_SATISFIED`,
+            `NOT_EVALUABLE`, or `MANUAL_REVIEW`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CdmEligibilityEvaluationResponse'
+        '400':
+          description: Malformed JSON, non-object body, missing required envelope fields, or wrong structural types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Missing or invalid bearer/JWT credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authenticated but missing `sg:cdm:eligibility:evaluate` or `sg:admin`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server-side evaluation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
-  schemas: {}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Supports either JWT bearer tokens with route-specific `scope` claims or a
+        static `API_BEARER_TOKEN` bearer value that maps to `sg:admin`.
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    ValidationError:
+      type: object
+      required: [path, message]
+      properties:
+        path:
+          type: string
+        message:
+          type: string
+    ValidationErrorResponse:
+      type: object
+      required: [error, validation_errors]
+      properties:
+        error:
+          type: string
+        validation_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+    EligibleCollateralSpecification:
+      type: object
+      required: [criteria]
+      properties:
+        id:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        criteria:
+          type: object
+          additionalProperties: true
+    EvidenceReference:
+      type: object
+      required:
+        - evidence_id
+        - source
+        - attribute
+        - claim_value
+        - observed_at
+      properties:
+        evidence_id:
+          type: string
+        source:
+          type: string
+        attribute:
+          type: string
+        claim_value:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        provenance:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        integrity_hash:
+          type: string
+          nullable: true
+    EligibilityEvidencePackage:
+      type: object
+      required: [evidence]
+      properties:
+        package_id:
+          type: string
+          nullable: true
+        collateral_reference:
+          type: string
+          nullable: true
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    CdmEligibilityEvaluationRequest:
+      type: object
+      required:
+        - collateral_reference
+        - evidence_package
+      properties:
+        collateral_reference:
+          type: string
+        specification:
+          $ref: '#/components/schemas/EligibleCollateralSpecification'
+        specification_reference:
+          type: string
+        evidence_package:
+          $ref: '#/components/schemas/EligibilityEvidencePackage'
+    MatchingEligibilityCriterionSummary:
+      type: object
+      properties:
+        identifier:
+          type: string
+        reference:
+          type: string
+    CdmEligibilityAssessmentResultSummary:
+      type: object
+      required: [isEligible, matching_criteria]
+      properties:
+        isEligible:
+          type: boolean
+        matching_criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchingEligibilityCriterionSummary'
+    EligibilityCriterion:
+      oneOf:
+        - type: string
+        - $ref: '#/components/schemas/MatchingEligibilityCriterionSummary'
+    CdmEligibilityAssessmentDiagnostic:
+      type: object
+      required: [reason_code, message]
+      properties:
+        reason_code:
+          type: string
+        message:
+          type: string
+        field:
+          type: string
+          nullable: true
+        evidence_id:
+          type: string
+          nullable: true
+    EvidenceReferenceDiagnostic:
+      type: object
+      required: [reason_codes, message, evidence]
+      properties:
+        evidence_id:
+          type: string
+          nullable: true
+        field:
+          type: string
+          nullable: true
+        reason_codes:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+        evidence:
+          type: object
+          additionalProperties: true
+    CdmVerificationMetadata:
+      type: object
+      required: [verified]
+      properties:
+        verified:
+          type: boolean
+        reason:
+          type: string
+          nullable: true
+        key_id:
+          type: string
+          nullable: true
+        algorithm:
+          type: string
+          nullable: true
+        content_hash:
+          type: string
+          nullable: true
+        signature:
+          type: string
+          nullable: true
+    CdmEligibilityEvidencePolicy:
+      type: object
+      required:
+        - max_evidence_age_ms
+        - future_timestamp_tolerance_ms
+        - require_provenance
+        - require_integrity_hash
+        - freshness_boundary
+      properties:
+        max_evidence_age_ms:
+          type: integer
+        future_timestamp_tolerance_ms:
+          type: integer
+        require_provenance:
+          type: boolean
+        require_integrity_hash:
+          type: boolean
+        freshness_boundary:
+          type: string
+          enum: [age_lte_max_evidence_age_ms]
+    EvidenceFieldMap:
+      type: object
+      required:
+        - maturity
+        - collateralAssetType
+        - assetCountryOfOrigin
+        - denominatedCurrency
+        - agencyRating
+        - issuerType
+        - issuerName
+      properties:
+        maturity:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+        collateralAssetType:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+        assetCountryOfOrigin:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+        denominatedCurrency:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+        agencyRating:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+        issuerType:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+        issuerName:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    CdmEligibilityEvidenceSufficiencySummary:
+      type: object
+      required:
+        - is_sufficient
+        - requires_manual_review
+        - submitted_evidence_count
+        - accepted_evidence_count
+        - missing_fields
+        - invalid_fields
+        - stale_fields
+        - conflicting_fields
+        - reason_codes
+      properties:
+        is_sufficient:
+          type: boolean
+        requires_manual_review:
+          type: boolean
+        submitted_evidence_count:
+          type: integer
+        accepted_evidence_count:
+          type: integer
+        missing_fields:
+          type: array
+          items:
+            type: string
+        invalid_fields:
+          type: array
+          items:
+            type: string
+        stale_fields:
+          type: array
+          items:
+            type: string
+        conflicting_fields:
+          type: array
+          items:
+            type: string
+        reason_codes:
+          type: array
+          items:
+            type: string
+    EligibilityQuery:
+      type: object
+      required:
+        - maturity
+        - collateralAssetType
+        - assetCountryOfOrigin
+        - denominatedCurrency
+        - agencyRating
+        - issuerType
+        - issuerName
+      properties:
+        maturity:
+          type: string
+        collateralAssetType:
+          type: string
+        assetCountryOfOrigin:
+          type: string
+        denominatedCurrency:
+          type: string
+        agencyRating:
+          type: string
+        issuerType:
+          type: string
+        issuerName:
+          type: string
+    CheckEligibilityResult:
+      type: object
+      required:
+        - isEligible
+        - matchingEligibleCriteria
+        - eligibilityQuery
+        - specification
+      properties:
+        isEligible:
+          type: boolean
+        matchingEligibleCriteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/EligibilityCriterion'
+        eligibilityQuery:
+          $ref: '#/components/schemas/EligibilityQuery'
+        specification:
+          $ref: '#/components/schemas/EligibleCollateralSpecification'
+    CdmEligibilityEvaluationResponse:
+      type: object
+      required:
+        - assessment_id
+        - assessment_type
+        - status
+        - legacy_status
+        - reason_codes
+        - collateral_reference
+        - specification_reference
+        - evidence_package_id
+        - evidence_reference_ids
+        - evidence_sufficiency
+        - cdm_function
+        - cdm_model_version
+        - provider_version
+        - provider_name
+        - evaluated_at
+        - specification
+        - query
+        - query_hash
+        - evidence_lineage_hash
+        - evidence_lineage
+        - accepted_evidence
+        - rejected_evidence
+        - submitted_evidence
+        - missing_fields
+        - conflicting_fields
+        - invalid_fields
+        - stale_fields
+        - diagnostics
+        - evidence_policy
+        - verification
+        - cdm_result_summary
+        - check_eligibility_result
+        - error_code
+        - error_message
+      properties:
+        assessment_id:
+          type: string
+        assessment_type:
+          type: string
+          enum: [CDM_COLLATERAL_ELIGIBILITY]
+        status:
+          type: string
+          enum: [SATISFIED, NOT_SATISFIED, NOT_EVALUABLE, MANUAL_REVIEW]
+        legacy_status:
+          type: string
+        reason_codes:
+          type: array
+          items:
+            type: string
+        collateral_reference:
+          type: string
+          nullable: true
+        specification_reference:
+          type: string
+          nullable: true
+        evidence_package_id:
+          type: string
+          nullable: true
+        evidence_reference_ids:
+          type: array
+          items:
+            type: string
+        evidence_sufficiency:
+          $ref: '#/components/schemas/CdmEligibilityEvidenceSufficiencySummary'
+        cdm_function:
+          type: string
+          enum: [cdm.product.collateral.CheckEligibilityByDetails]
+        cdm_model_version:
+          type: string
+          nullable: true
+        provider_version:
+          type: string
+          nullable: true
+        provider_name:
+          type: string
+          nullable: true
+        evaluated_at:
+          type: string
+          format: date-time
+        specification:
+          allOf:
+            - $ref: '#/components/schemas/EligibleCollateralSpecification'
+          nullable: true
+        query:
+          allOf:
+            - $ref: '#/components/schemas/EligibilityQuery'
+          nullable: true
+        query_hash:
+          type: string
+          nullable: true
+        evidence_lineage_hash:
+          type: string
+          nullable: true
+        evidence_lineage:
+          $ref: '#/components/schemas/EvidenceFieldMap'
+        accepted_evidence:
+          $ref: '#/components/schemas/EvidenceFieldMap'
+        rejected_evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceReferenceDiagnostic'
+        submitted_evidence:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        missing_fields:
+          type: array
+          items:
+            type: string
+        conflicting_fields:
+          type: array
+          items:
+            type: string
+        invalid_fields:
+          type: array
+          items:
+            type: string
+        stale_fields:
+          type: array
+          items:
+            type: string
+        diagnostics:
+          type: array
+          items:
+            $ref: '#/components/schemas/CdmEligibilityAssessmentDiagnostic'
+        evidence_policy:
+          allOf:
+            - $ref: '#/components/schemas/CdmEligibilityEvidencePolicy'
+          nullable: true
+        verification:
+          allOf:
+            - $ref: '#/components/schemas/CdmVerificationMetadata'
+          nullable: true
+        cdm_result_summary:
+          allOf:
+            - $ref: '#/components/schemas/CdmEligibilityAssessmentResultSummary'
+          nullable: true
+        check_eligibility_result:
+          allOf:
+            - $ref: '#/components/schemas/CheckEligibilityResult'
+          nullable: true
+        error_code:
+          type: string
+          nullable: true
+        error_message:
+          type: string
+          nullable: true

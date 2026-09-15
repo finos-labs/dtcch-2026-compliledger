@@ -432,6 +432,7 @@ Determinism is what makes SettlementGuard suitable as a **shared validation prim
 | `/v1/public-key` | GET | Fetch the active public verification key and metadata |
 | `/v1/canton/status` | GET | Canton network / configuration status |
 | `/v1/canton/commitments/:attestationHash` | GET | Lookup a commitment by attestation hash |
+| `/v1/cdm/collateral/eligibility/evaluate` | POST | Assess evidence-backed CDM collateral eligibility without creating a transaction or intent record |
 | `/v1/demo/evaluate` | POST | Evaluate an OSS rule pack independently of the proof chain |
 
 ### Example Flow
@@ -694,6 +695,87 @@ Relevant environment variables:
 | `CDM_ELIGIBILITY_PROVIDER=mock` | Enables the mock **TEST/REFERENCE ONLY** provider |
 | `CDM_ELIGIBILITY_MOCK_RESPONSE` | JSON-encoded canned `CheckEligibilityResult` fixture for the mock provider |
 
+### Standalone CDM collateral eligibility API
+
+`POST /v1/cdm/collateral/eligibility/evaluate` exposes the Phase 3 assessment service as a
+standalone authenticated API. It is assessment-only: it does **not** submit an intent, create a
+transaction, issue an attestation, anchor to Canton, or call the Bedrock reasoning flow.
+
+- The request body is the CDM eligibility envelope itself — **not** a nested
+  `cdm_eligibility_request` wrapper.
+- `collateral_reference`, either `specification` or `specification_reference`, and
+  `evidence_package.evidence` are required at the HTTP boundary.
+- Provider selection remains server-configured through environment variables. The route does **not**
+  accept per-request provider URLs, credentials, or provider configuration IDs.
+- If both `specification` and `specification_reference` are supplied, `specification_reference`
+  must match `specification.id` or the assessment returns `MANUAL_REVIEW`.
+- Reference-only specification requests remain explicit. If the server has no trusted specification
+  resolver configured, the route returns `200` with `NOT_EVALUABLE` and
+  `SPECIFICATION_UNRESOLVED` rather than inventing criteria or fetching arbitrary URLs.
+
+HTTP behavior:
+
+- **Malformed JSON / wrong structural types / missing required envelope fields** → `400`
+- **Valid request with empty or insufficient evidence** → `200` with `NOT_EVALUABLE` or
+  `MANUAL_REVIEW`
+- **Provider unavailable / invalid / unverified** → explicit `NOT_EVALUABLE` assessment with
+  `CDM_EVALUATION_UNAVAILABLE`; SettlementGuard never converts provider failure into a pass or
+  ineligible result
+
+Example — sufficient evidence, provider-evaluable:
+
+```json
+{
+  "collateral_reference": "COLL-UST-001",
+  "specification": {
+    "id": "SPEC-GMSLA-2026",
+    "name": "GMSLA Eligible Collateral",
+    "version": "1.0",
+    "criteria": {
+      "schedule": "fixture"
+    }
+  },
+  "specification_reference": "SPEC-GMSLA-2026",
+  "evidence_package": {
+    "package_id": "pkg-eligibility-001",
+    "collateral_reference": "COLL-UST-001",
+    "evidence": [
+      {
+        "evidence_id": "ev-maturity-001",
+        "source": "issuer-feed",
+        "attribute": "maturity",
+        "claim_value": "2028-12-31",
+        "observed_at": "2026-09-15T12:00:00Z",
+        "provenance": "issuer-feed/v1",
+        "integrity_hash": "sha256:maturity-fixture"
+      }
+    ]
+  }
+}
+```
+
+> Populate the remaining required evidence entries with the same shape as the example above, one
+> per required `EligibilityQuery` attribute, using fresh ISO-8601 `observed_at` timestamps relative
+> to the evaluation time.
+
+Example — structurally valid but insufficient evidence (`200`, not `400`):
+
+```json
+{
+  "collateral_reference": "COLL-UST-001",
+  "specification_reference": "SPEC-GMSLA-2026",
+  "evidence_package": {
+    "package_id": "pkg-eligibility-empty",
+    "collateral_reference": "COLL-UST-001",
+    "evidence": []
+  }
+}
+```
+
+This request reaches the service and returns a deterministic `NOT_EVALUABLE` assessment because
+the evidence package is present but empty. By contrast, omitting `evidence_package` or replacing
+`evidence_package.evidence` with a non-array is an HTTP `400` validation error.
+
 ### Authentication & route scopes
 
 The backend supports two authentication modes (configure at least one):
@@ -711,6 +793,7 @@ Required scopes per route (enforced by `requireScope` in `backend/src/middleware
 | `POST /v1/attestations/:id/anchor` | `sg:attestations:write` (alias: `sg:anchor:write`) |
 | `POST /v1/reasoning/:id` | `sg:reasoning:read` |
 | `GET  /v1/audit/:id` | `sg:audit:read` |
+| `POST /v1/cdm/collateral/eligibility/evaluate` | `sg:cdm:eligibility:evaluate` |
 | `POST /v1/demo/evaluate` | `sg:demo:evaluate` |
 
 `sg:admin` satisfies any required scope.
