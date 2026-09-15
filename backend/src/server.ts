@@ -538,8 +538,16 @@ app.post(CDM_ELIGIBILITY_ROUTE_PATH, async (req, res) => {
   }
 
   const request = toInternalCdmEligibilityRequest(validation.request);
-  const assessment = await evaluateEvidenceBackedCollateralEligibility(request);
-  res.status(200).json(toCdmEligibilityEvaluationApiResponse(assessment));
+  try {
+    const assessment = await evaluateEvidenceBackedCollateralEligibility(request);
+    res.status(200).json(toCdmEligibilityEvaluationApiResponse(assessment));
+  } catch (error: unknown) {
+    logger.error(
+      { err: error instanceof Error ? error.message : String(error) },
+      "CDM collateral eligibility evaluation failed"
+    );
+    res.status(500).json({ error: "CDM collateral eligibility evaluation failed" });
+  }
 });
 
 // POST /v1/demo/evaluate — Evaluate a payload against a rule pack
