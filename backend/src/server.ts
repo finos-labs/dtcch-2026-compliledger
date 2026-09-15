@@ -62,7 +62,7 @@ app.use(
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if ((req.path === CDM_ELIGIBILITY_ROUTE_PATH || req.originalUrl === CDM_ELIGIBILITY_ROUTE_PATH)
+  if (req.path === CDM_ELIGIBILITY_ROUTE_PATH
     && typeof err === "object"
     && err
     && "type" in err
