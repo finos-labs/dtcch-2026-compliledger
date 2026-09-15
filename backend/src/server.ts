@@ -28,10 +28,7 @@ import type { AuthenticatedRequest } from "./middleware/auth";
 import { writeRegulatoryEvent, getRegulatoryEvents } from "./audit/regulatory-log";
 import { cantonCircuit, bedrockCircuit } from "./circuit-breaker";
 import type { CdmEligibilityAssessment, CdmEligibilityRequest } from "./cdm/types";
-import { prepareEligibilityEvidence } from "./cdm/evidence";
-import { createCollateralEligibilityProvider } from "./cdm/adapter";
-import { CdmEligibilityProviderError } from "./cdm/provider";
-import { buildCdmEligibilityAssessment } from "./cdm/assessment";
+import { evaluateEvidenceBackedCollateralEligibility } from "./cdm/service";
 
 guardStartup();
 
@@ -127,50 +124,7 @@ async function resolveCdmEligibilityAssessment(
   }
 
   const request = body.cdm_eligibility_request as CdmEligibilityRequest;
-  if (!request.specification || typeof request.specification !== "object") {
-    return {
-      status: "technical_error",
-      evaluated_at: new Date().toISOString(),
-      specification: { criteria: {} },
-      error_code: "invalid_cdm_request",
-      error_message: "cdm_eligibility_request.specification is required",
-    };
-  }
-  const preparedEvidence = prepareEligibilityEvidence(request);
-
-  if (preparedEvidence.missing_fields.length > 0 || preparedEvidence.conflicting_fields.length > 0) {
-    return buildCdmEligibilityAssessment({ request, preparedEvidence });
-  }
-
-  try {
-    const cdmEligibilityProvider = createCollateralEligibilityProvider();
-    if (!cdmEligibilityProvider) {
-      return buildCdmEligibilityAssessment({
-        request,
-        preparedEvidence,
-        technicalError: {
-          code: "cdm_provider_not_configured",
-          message: "CDM collateral eligibility provider is not configured",
-        },
-      });
-    }
-    const cdmResponse = await cdmEligibilityProvider.evaluateEligibility(
-      request.specification,
-      preparedEvidence.query
-    );
-    return buildCdmEligibilityAssessment({ request, preparedEvidence, cdmResponse });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown CDM eligibility provider error";
-    const code = err instanceof CdmEligibilityProviderError ? err.code : "cdm_provider_error";
-    return buildCdmEligibilityAssessment({
-      request,
-      preparedEvidence,
-      technicalError: {
-        code,
-        message,
-      },
-    });
-  }
+  return evaluateEvidenceBackedCollateralEligibility(request);
 }
 
 function validateIntent(body: unknown): { valid: boolean; error?: string; intent?: SettlementIntent } {

@@ -24,20 +24,50 @@ export interface ProofBundle {
   steps: ProofStep[];
   bundle_root_hash: string;
   cdm_eligibility_assessment?: {
-    status: "eligible" | "ineligible" | "indeterminate_missing_evidence" | "indeterminate_conflicting_evidence" | "technical_error";
+    assessment_id: string;
+    assessment_type: "CDM_COLLATERAL_ELIGIBILITY";
+    status: "SATISFIED" | "NOT_SATISFIED" | "NOT_EVALUABLE" | "MANUAL_REVIEW";
+    legacy_status: "eligible" | "ineligible" | "indeterminate_missing_evidence" | "indeterminate_conflicting_evidence" | "technical_error";
+    reason_codes: string[];
+    collateral_reference: string | null;
+    specification_reference: string | null;
+    evidence_package_id: string | null;
+    evidence_reference_ids: string[];
+    cdm_function: "cdm.product.collateral.CheckEligibilityByDetails";
+    cdm_model_version: string | null;
+    provider_version: string | null;
+    provider_name: string | null;
     evaluated_at: string;
-    specification: Record<string, unknown>;
+    specification: Record<string, unknown> | null;
     query?: Record<string, string>;
-    query_hash?: string;
-    evidence_lineage_hash?: string;
+    query_hash?: string | null;
+    evidence_lineage_hash?: string | null;
     evidence_lineage?: Record<string, Array<Record<string, unknown>>>;
+    accepted_evidence?: Record<string, Array<Record<string, unknown>>>;
+    rejected_evidence?: Array<{
+      evidence_id: string | null;
+      field: string | null;
+      reason_codes: string[];
+      message: string;
+      evidence: Record<string, unknown>;
+    }>;
+    submitted_evidence?: Array<Record<string, unknown>>;
     missing_fields?: string[];
     conflicting_fields?: string[];
-    cdm_function?: {
-      provider_name: string;
-      cdm_function: "cdm.product.collateral.CheckEligibilityByDetails";
-      cdm_model_version: string;
-      provider_version: string;
+    invalid_fields?: string[];
+    stale_fields?: string[];
+    diagnostics?: Array<{
+      reason_code: string;
+      message: string;
+      field?: string;
+      evidence_id?: string | null;
+    }>;
+    evidence_policy?: {
+      max_evidence_age_ms: number;
+      future_timestamp_tolerance_ms: number;
+      require_provenance: boolean;
+      require_integrity_hash: boolean;
+      freshness_boundary: "age_lte_max_evidence_age_ms";
     };
     verification?: {
       verified: boolean;
@@ -52,6 +82,13 @@ export interface ProofBundle {
       matchingEligibleCriteria: unknown[];
       eligibilityQuery: Record<string, unknown>;
       specification: Record<string, unknown>;
+    };
+    cdm_result_summary?: {
+    isEligible: boolean;
+    matching_criteria: Array<{
+      identifier?: string;
+      reference?: string;
+    }>;
     };
     error_code?: string;
     error_message?: string;

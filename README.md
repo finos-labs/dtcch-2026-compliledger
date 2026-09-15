@@ -634,9 +634,10 @@ DYNAMO_TABLE=sg-commitment-registry
 ### CDM collateral eligibility provider boundary
 
 SettlementGuard can optionally attach a `cdm_eligibility_assessment` to the sealed bundle when
-`cdm_eligibility_request` is supplied. Phase 2 keeps SettlementGuard on an adapter boundary:
-it prepares evidence-backed collateral attributes locally, then calls a provider for
-`cdm.product.collateral.CheckEligibilityByDetails`. SettlementGuard does **not** recreate the
+`cdm_eligibility_request` is supplied. Phase 3 keeps SettlementGuard on an adapter boundary:
+it deterministically validates evidence sufficiency, builds a normalized `EligibilityQuery` only
+when all required fields are supported by fresh non-conflicting evidence, and then calls a provider
+for `cdm.product.collateral.CheckEligibilityByDetails`. SettlementGuard does **not** recreate the
 CDM eligibility algorithm locally.
 
 - `ExternalCdmEligibilityProvider` sends the local adapter DTOs (`EligibleCollateralSpecification`
@@ -644,8 +645,40 @@ CDM eligibility algorithm locally.
   `CheckEligibilityResult`-compatible response.
 - `MockCdmEligibilityProvider` is a **TEST/REFERENCE ONLY** provider for local demos and tests.
   It returns explicitly configured canned fixtures and must not be treated as a real CDM engine.
-- Provider failures are returned as explicit `technical_error` assessments; SettlementGuard never
-  infers eligibility from an unavailable or invalid provider response.
+- `evaluateEvidenceBackedCollateralEligibility(...)` returns one of four normalized assessment
+  states: `SATISFIED`, `NOT_SATISFIED`, `NOT_EVALUABLE`, or `MANUAL_REVIEW`.
+- Evidence gate failures never call the provider. Missing/invalid/stale/insufficient evidence
+  returns `NOT_EVALUABLE`; conflicting evidence, duplicate evidence IDs, or collateral/specification
+  reference mismatches return `MANUAL_REVIEW`.
+- Provider failures are returned as explicit `NOT_EVALUABLE` assessments with
+  `CDM_EVALUATION_UNAVAILABLE`; SettlementGuard never infers eligibility from an unavailable,
+  malformed, or unverified provider response.
+- Assessments are evidence and workflow signals only. They do **not** authorize, block, or execute
+  transactions.
+
+Assessment payload highlights:
+
+- `assessment_type` is always `CDM_COLLATERAL_ELIGIBILITY`.
+- `legacy_status` is included as a bridge for Phase 2 consumers that still expect the earlier
+  lowercase status family.
+- `reason_codes` are deterministic and ordered from evidence/manual-review faults through provider
+  faults to final eligibility (`CDM_COLLATERAL_ELIGIBLE` / `CDM_COLLATERAL_INELIGIBLE`).
+- `evidence_reference_ids`, `accepted_evidence`, `rejected_evidence`, `submitted_evidence`,
+  `query`, `query_hash`, and `evidence_lineage_hash` preserve evidence lineage.
+- `evidence_policy` currently requires `provenance` and `integrity_hash`, rejects future timestamps,
+  and treats evidence as fresh when `observed_at` age is less than or equal to the configured
+  `max_evidence_age_ms` boundary.
+- `cdm_model_version` and `provider_version` are `null` when the provider was not successfully
+  invoked or when trustworthy metadata is unavailable; they are never fabricated.
+
+`cdm_eligibility_request` accepts:
+
+- `collateral_reference`
+- either `specification` or `specification_reference` (reference-only requests require an explicit
+  resolver)
+- `evidence_package` with `package_id?`, `collateral_reference?`, and flat `evidence[]`
+- legacy `query_evidence` remains accepted for backward compatibility; when used, the assessment
+  keeps `evidence_package_id: null` rather than inventing one
 
 Relevant environment variables:
 

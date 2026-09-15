@@ -10,6 +10,14 @@ import { CdmEligibilityProviderError, type CollateralEligibilityProvider } from 
 
 const MOCK_PROVIDER_NAME = "Mock CDM Eligibility Provider (TEST/REFERENCE ONLY)";
 
+function cloneJson<T>(value: T): T {
+  const clone = (globalThis as typeof globalThis & {
+    structuredClone?: <TValue>(input: TValue) => TValue;
+  }).structuredClone;
+  if (clone) return clone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -95,7 +103,7 @@ export class MockCdmEligibilityProvider implements CollateralEligibilityProvider
       verified: true,
       reason: "test_reference_provider",
     };
-    const resolvedResult = structuredClone({
+    const resolvedResult = cloneJson({
       ...result,
       eligibilityQuery: query,
       specification,
