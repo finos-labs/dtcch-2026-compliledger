@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node scripts/canton-status-test.mjs && node scripts/cdm-provider-test.mjs && node scripts/cdm-assessment-test.mjs",
+    "test": "npm run build && node scripts/canton-status-test.mjs && node scripts/cdm-provider-test.mjs && node scripts/cdm-assessment-test.mjs && node scripts/contribution-test.mjs",
     "test:e2e": "node scripts/e2e-test.mjs",
     "test:cdm-provider": "npm run build && node scripts/cdm-provider-test.mjs",
     "test:cdm-assessment": "npm run build && node scripts/cdm-assessment-test.mjs",
