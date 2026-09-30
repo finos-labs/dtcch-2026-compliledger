@@ -564,6 +564,19 @@ for (const missingOrInvalid of [
 const otherVersion = ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v2");
 assert.equal(contribution.verifyCollateralEligibilityProof(proof, otherVersion).replay, "UNAVAILABLE");
 assert.equal(contribution.verifyCollateralEligibilityProof(proof).replay, "UNAVAILABLE");
+assert.equal(contribution.verifyCollateralEligibilityProof(proof, forgedHandle).replay, "UNAVAILABLE");
+const mismatchedMetadata = syntheticMetadata("synthetic-versioned-rule", "test-v1");
+mismatchedMetadata.sourceDocument.value.title = "Different synthetic document";
+const mismatchedCatalog = new contribution.CollateralEligibilityRuleCatalog();
+const mismatchedRegistration = mismatchedCatalog.register(
+  syntheticDefinition(mismatchedMetadata, () => outputFor(mismatchedMetadata)),
+  syntheticAdmission(mismatchedMetadata)
+);
+assert.equal(mismatchedRegistration.ok, true);
+const metadataMismatchResult = contribution.verifyCollateralEligibilityProof(proof, mismatchedRegistration.handle);
+assert.equal(metadataMismatchResult.integrity, "VERIFIED");
+assert.equal(metadataMismatchResult.replay, "UNAVAILABLE");
+assert.ok(metadataMismatchResult.reasons.some((reason) => reason.code === "RULE_METADATA_MISMATCH"));
 const inconsistentMetadata = structuredClone(proof);
 inconsistentMetadata.assessment.evaluation.ruleMetadata.ruleVersion = "test-v2";
 assert.equal(contribution.verifyCollateralEligibilityProof(inconsistentMetadata, registeredRule).integrity, "FAILED");
@@ -588,6 +601,7 @@ const callsBeforeTampering = versionOneCalls;
 for (const mutate of [
   (artifact) => { artifact.replay.input.value.sourceReference = "tampered-reference"; },
   (artifact) => { artifact.replay.evidence.value[0].observedValue = "tampered-evidence"; },
+  (artifact) => { artifact.assessment.mappings[0].sourcePath = "tampered.path"; },
   (artifact) => { artifact.assessment.mappings[0].mappingVersion = "tampered-map-version"; },
   (artifact) => { artifact.assessment.context.evaluatedAt = "2026-09-29T12:00:00.000Z"; },
   (artifact) => { artifact.assessment.evaluation.rule.version = "test-v2"; },
@@ -601,6 +615,9 @@ for (const mutate of [
   assert.equal(result.integrity, "FAILED");
   assert.equal(result.replay, "NOT_ATTEMPTED");
 }
+const embeddedExecutable = structuredClone(proof);
+embeddedExecutable.execute = () => { throw new Error("artifact code must never run"); };
+assert.equal(contribution.verifyCollateralEligibilityProof(embeddedExecutable, registeredRule).integrity, "FAILED");
 assert.equal(versionOneCalls, callsBeforeTampering, "Integrity failures must not invoke a registered callback");
 const staleState = structuredClone(proof);
 staleState.operationalState.freshness = "FRESH";
@@ -634,6 +651,16 @@ for (const mutate of [
 const malformedArtifact = structuredClone(proof);
 malformedArtifact.replay.input.value = Number.NaN;
 assert.equal(contribution.verifyCollateralEligibilityProof(malformedArtifact, registeredRule).integrity, "FAILED");
+const malformedAssessment = structuredClone(proof);
+delete malformedAssessment.assessment.facts[0].mappingVersion;
+const callsBeforeMalformedReplay = versionOneCalls;
+const malformedAssessmentResult = contribution.verifyCollateralEligibilityProof(
+  rehashArtifact(malformedAssessment), registeredRule
+);
+assert.equal(malformedAssessmentResult.integrity, "FAILED");
+assert.equal(malformedAssessmentResult.replay, "NOT_ATTEMPTED");
+assert.equal(versionOneCalls, callsBeforeMalformedReplay,
+  "Malformed assessment schemas must be rejected before callback execution");
 let accessorCalls = 0;
 const accessorInput = {
   sourceReference: "synthetic-accessor-input",

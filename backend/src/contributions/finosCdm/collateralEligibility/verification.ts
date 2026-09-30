@@ -28,6 +28,88 @@ function exactKeys(value: unknown, keys: string[]): value is Record<string, unkn
     keys.every((key) => Object.hasOwn(value, key));
 }
 
+function allowedKeys(value: unknown, required: string[], optional: string[] = []): value is Record<string, unknown> {
+  return isRecord(value) && required.every((key) => Object.hasOwn(value, key)) &&
+    Object.keys(value).every((key) => required.includes(key) || optional.includes(key));
+}
+
+function validReason(value: unknown): boolean {
+  return allowedKeys(value, ["code", "message"], ["factRef", "evidenceId", "sourceReference"]) &&
+    typeof value.code === "string" && typeof value.message === "string" &&
+    ["factRef", "evidenceId", "sourceReference"].every((key) =>
+      value[key] === undefined || typeof value[key] === "string");
+}
+
+function validSource(value: unknown): boolean {
+  return allowedKeys(value, ["sourceReference"], ["sourcePath"]) &&
+    typeof value.sourceReference === "string" &&
+    (value.sourcePath === undefined || typeof value.sourcePath === "string");
+}
+
+function validFact(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.factRef !== "string" || !validSource(value.source)) return false;
+  if (value.kind === "SOURCE") {
+    return exactKeys(value, [
+      "kind", "factRef", "observedValue", "source", "mappingId", "mappingVersion", "mappingStatus",
+    ]) && typeof value.mappingId === "string" && typeof value.mappingVersion === "string" &&
+      value.mappingStatus === "CALLER_SUPPLIED_UNVALIDATED";
+  }
+  if (value.kind === "DERIVED") {
+    return exactKeys(value, [
+      "kind", "factRef", "observedValue", "derivationId", "derivationVersion", "inputFactRefs", "source",
+    ]) && typeof value.derivationId === "string" && typeof value.derivationVersion === "string" &&
+      Array.isArray(value.inputFactRefs) && value.inputFactRefs.every((factRef) => typeof factRef === "string");
+  }
+  return value.kind === "UNAVAILABLE" &&
+    exactKeys(value, ["kind", "factRef", "source", "mappingStatus"]) &&
+    ["UNMAPPED", "CALLER_SUPPLIED_UNVALIDATED"].includes(String(value.mappingStatus));
+}
+
+function validEvidence(value: unknown): boolean {
+  return allowedKeys(value,
+    ["evidenceId", "source", "sourceReference", "observedValue", "validation"],
+    ["observedAt", "provenance", "factRef"]) &&
+    typeof value.evidenceId === "string" && typeof value.source === "string" &&
+    typeof value.sourceReference === "string" &&
+    ["UNVALIDATED", "INVALID"].includes(String(value.validation)) &&
+    (value.observedAt === undefined ||
+      (typeof value.observedAt === "string" && !Number.isNaN(Date.parse(value.observedAt)))) &&
+    (value.provenance === undefined || typeof value.provenance === "string") &&
+    (value.factRef === undefined || typeof value.factRef === "string");
+}
+
+function validAssessment(value: unknown): boolean {
+  if (!exactKeys(value, [
+    "contributionId", "input", "mappings", "facts", "adapterDiagnostics", "evidence",
+    "sourceValidation", "context", "evaluation",
+  ]) || value.contributionId !== "finos-cdm-collateral-eligibility" ||
+    value.sourceValidation !== "PENDING_SOURCE_VALIDATION" ||
+    !exactKeys(value.input, ["sourceObject", "sourceReference"]) ||
+    (value.input.sourceObject !== null && !isRecord(value.input.sourceObject)) ||
+    (value.input.sourceReference !== null && typeof value.input.sourceReference !== "string") ||
+    !Array.isArray(value.mappings) || !value.mappings.every((mapping) =>
+      exactKeys(mapping, ["factRef", "sourcePath", "mappingId", "mappingVersion", "status"]) &&
+      ["factRef", "sourcePath", "mappingId", "mappingVersion"].every((key) =>
+        typeof mapping[key] === "string") && mapping.status === "CALLER_SUPPLIED_UNVALIDATED") ||
+    !Array.isArray(value.facts) || !value.facts.every(validFact) ||
+    !Array.isArray(value.adapterDiagnostics) || !value.adapterDiagnostics.every(validReason) ||
+    !Array.isArray(value.evidence) || !value.evidence.every(validEvidence) ||
+    !isRecord(value.context) || typeof value.context.evaluatedAt !== "string" ||
+    Number.isNaN(Date.parse(value.context.evaluatedAt)) ||
+    !allowedKeys(value.evaluation, [
+      "decision", "rule", "reasons", "evidenceDiagnostics", "sourceValidation",
+    ], ["ruleMetadata", "sourceReview"])) return false;
+  const evaluation = value.evaluation;
+  return decisions.includes(evaluation.decision as Decision) &&
+    evaluation.sourceValidation === "PENDING_SOURCE_VALIDATION" &&
+    (evaluation.rule === null || exactKeys(evaluation.rule, ["id", "version"]) &&
+      typeof evaluation.rule.id === "string" && typeof evaluation.rule.version === "string") &&
+    (evaluation.ruleMetadata === undefined || isRecord(evaluation.ruleMetadata)) &&
+    (evaluation.sourceReview === undefined || isRecord(evaluation.sourceReview)) &&
+    Array.isArray(evaluation.reasons) && evaluation.reasons.every(validReason) &&
+    Array.isArray(evaluation.evidenceDiagnostics) && evaluation.evidenceDiagnostics.every(validReason);
+}
+
 function failure(
   integrity: ProofVerification["integrity"],
   replay: ProofVerification["replay"],
@@ -101,7 +183,7 @@ export function verifyCollateralEligibilityProof(
       !["ABSENT", "NULL", "VALUE"].includes(body.replay.evidence.status) ||
       !isRecord(body.replay.context) || typeof body.replay.context.evaluatedAt !== "string" ||
       Number.isNaN(Date.parse(body.replay.context.evaluatedAt)) ||
-      !isRecord(body.assessment) || !isRecord(body.assessment.evaluation)) {
+      !validAssessment(body.assessment)) {
       return failure("FAILED", "NOT_ATTEMPTED", "ARTIFACT_MALFORMED",
         "Proof artifact replay inputs or assessment are invalid", decision);
     }
