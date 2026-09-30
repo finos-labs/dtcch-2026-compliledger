@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
+import { adaptCollateralInput } from "./adapter";
 import { assessCollateralEligibility } from "./assessment";
+import { validateEvidence } from "./evidence";
 import { canonicalizeProofJson, operationalStateForAssessment, subjectForAssessment } from "./proof-artifact";
 import { getRegisteredRuleProvenance } from "./registration";
 import type {
@@ -110,6 +112,12 @@ function validAssessment(value: unknown): boolean {
     Array.isArray(evaluation.evidenceDiagnostics) && evaluation.evidenceDiagnostics.every(validReason);
 }
 
+function sameReasonSet(left: unknown[], right: unknown[]): boolean {
+  const canonicalSet = (values: unknown[]) =>
+    [...new Set(values.map((value) => canonicalizeProofJson(value)))].sort();
+  return canonicalizeProofJson(canonicalSet(left)) === canonicalizeProofJson(canonicalSet(right));
+}
+
 function failure(
   integrity: ProofVerification["integrity"],
   replay: ProofVerification["replay"],
@@ -194,6 +202,35 @@ export function verifyCollateralEligibilityProof(
         "Recorded subject or operational state is inconsistent with its assessment", decision);
     }
 
+    const replay = body.replay as AssessmentReplay;
+    const adapted = adaptCollateralInput(replayInput(replay.input));
+    const validated = validateEvidence(replayInput(replay.evidence));
+    const normalizedAssessment = {
+      contributionId: adapted.contributionId,
+      input: { sourceObject: adapted.sourceObject, sourceReference: adapted.sourceReference },
+      mappings: adapted.mappings,
+      facts: adapted.facts,
+      adapterDiagnostics: adapted.diagnostics,
+      evidence: validated.evidence,
+      sourceValidation: adapted.sourceValidation,
+      context: replay.context,
+    };
+    const recordedNormalization = {
+      contributionId: body.assessment.contributionId,
+      input: body.assessment.input,
+      mappings: body.assessment.mappings,
+      facts: body.assessment.facts,
+      adapterDiagnostics: body.assessment.adapterDiagnostics,
+      evidence: body.assessment.evidence,
+      sourceValidation: body.assessment.sourceValidation,
+      context: body.assessment.context,
+    };
+    if (canonicalizeProofJson(normalizedAssessment) !== canonicalizeProofJson(recordedNormalization) ||
+      !sameReasonSet(validated.diagnostics, body.assessment.evaluation.evidenceDiagnostics)) {
+      return failure("VERIFIED", "MISMATCH", "NORMALIZATION_MISMATCH",
+        "Recorded facts, mappings, evidence, or diagnostics do not match replay inputs", decision);
+    }
+
     const evaluation = body.assessment.evaluation;
     let trustedHandle: unknown;
     if (evaluation.rule === null) {
@@ -229,7 +266,6 @@ export function verifyCollateralEligibilityProof(
       trustedHandle = ruleHandle;
     }
 
-    const replay = body.replay as AssessmentReplay;
     const replayed = assessCollateralEligibility(
       replayInput(replay.input),
       replayInput(replay.evidence),

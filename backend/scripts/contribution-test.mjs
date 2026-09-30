@@ -629,8 +629,12 @@ assert.ok(stateMismatch.reasons.some((reason) => reason.code === "SUBJECT_STATE_
 const coherentPayloadWithOldCommitment = rehashArtifact(proof);
 coherentPayloadWithOldCommitment.replay.input.value.sourceReference = "altered-with-new-hash";
 const rehashedInconsistentInput = rehashArtifact(coherentPayloadWithOldCommitment);
-assert.equal(contribution.verifyCollateralEligibilityProof(rehashedInconsistentInput, registeredRule).replay,
-  "MISMATCH", "A recomputed hash does not bypass deterministic replay");
+const callsBeforeInconsistentReplay = versionOneCalls;
+const inconsistentReplayResult = contribution.verifyCollateralEligibilityProof(rehashedInconsistentInput, registeredRule);
+assert.equal(inconsistentReplayResult.replay, "MISMATCH",
+  "A recomputed hash does not bypass deterministic replay");
+assert.equal(versionOneCalls, callsBeforeInconsistentReplay,
+  "Input/normalization inconsistencies are rejected before rule callback execution");
 
 const coherentEdited = structuredClone(proof);
 coherentEdited.replay.input.value.sourceObject.note = "coherent edit";
