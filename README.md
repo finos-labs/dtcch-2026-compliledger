@@ -2,9 +2,9 @@
 
 <div align="center">
 
-# CompliLedger — CompliOpen
+# CompliOpen
 
-### Deterministic Validation &amp; Attestation for CDM-Aligned Tokenized Workflows
+### Evidence-Backed Deterministic Evaluation &amp; Machine-Verifiable Proof for FINOS CDM
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge)](LICENSE)
 [![Canton](https://img.shields.io/badge/Ledger-Canton%20Network-6C4EE5?style=for-the-badge)](https://canton.network)
@@ -13,593 +13,309 @@
 
 </div>
 
----
+CompliOpen is CompliLedger's open-source implementation and contribution surface for deterministic, evidence-backed governance evaluation and machine-verifiable proof. The current FINOS/CDM use case being explored is **evidence-backed collateral eligibility using the FINOS Common Domain Model**. The authoritative requirement and source validation for that contribution are still pending.
 
-> **Regulation is shifting from static reporting to real-time, verifiable compliance.**
->
-> CompliOpen introduces a **deterministic validation and attestation layer** for tokenized financial workflows aligned with **CDM lifecycle events**, **ISDA / ISLA / ICMA** market standards, and emerging **digital asset policy frameworks**.
+The intended conceptual chain is:
 
-> 🔗 CompliOpen is actively being explored as a **CDM-aligned validation and attestation pattern** within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
+```text
+CDM collateral data → evidence → evidence validation and normalization
+→ authoritative eligibility rule → deterministic evaluation
+→ assessment → proof
+```
 
-CompliOpen is CompliLedger's open-source implementation and contribution surface. This repository's immediate FINOS/CDM use case is evidence-backed collateral eligibility; CompliOpen is not limited to that use case. The project began as SettlementGuard, CompliLedger's DTCC hackathon project. This repository does not identify or implement an authoritative FINOS, ISDA, ISLA, or ICMA collateral eligibility rule.
+This repository originated as SettlementGuard, CompliLedger's Innovate.DTCC 2026 hackathon project. Its existing reference rules, proof chain, Canton/Daml integration, cryptographic attestation, and demo UI remain available as historical and reference implementations. They are not silently reclassified as the current FINOS contribution. See [`docs/RENAME.md`](docs/RENAME.md) for retained compatibility identifiers.
 
-See [the rename and compatibility note](docs/RENAME.md) for the retained
-historical, signed-evidence, ledger, authentication, and external identifiers.
+## Current FINOS/CDM Focus — Evidence-Backed Collateral Eligibility
 
----
+CDM represents business data and provides eligibility functionality and modeling capabilities. A CDM function or model reference is not, by itself, proof of an authoritative regulatory requirement for this contribution.
 
-## What CompliOpen Is — and Is Not
+The proposed flow is intended to answer questions such as:
 
-| | CompliOpen **is not** | | CompliOpen **is** |
-|---|---|---|---|
-| ✕ | An execution system | ✓ | A deterministic validation and attestation layer |
-| ✕ | A broker-dealer | ✓ | Aligned to CDM lifecycle events |
-| ✕ | A workflow controller | ✓ | A producer of cryptographically verifiable evidence |
-| ✕ | A transaction engine | ✓ | External to workflow execution |
+- Which collateral facts are being evaluated?
+- What evidence supports each fact?
+- Is the evidence valid, fresh, sufficient, and non-conflicting?
+- Which authoritative requirement applies?
+- What exact rule and version were used?
+- Was the result produced deterministically?
+- Can an independent party verify the inputs, lineage, versions, and assessment?
 
----
-
-## Overview
-
-CompliOpen is a **pre-settlement compliance attestation module** built by CompliLedger.
-
-It evaluates structured transaction inputs against deterministic, machine-readable rule sets (aligned with ISDA, ISLA, and ICMA) and produces **cryptographically verifiable proof artifacts** representing compliance-related conditions at a specific point in time.
-
-> CompliOpen does not execute transactions, route orders, or make trading decisions.
-> It generates independent, tamper-evident attestations and verifiable signals that external systems independently interpret as part of their own workflow continuation.
-
----
-
-## Non-Intermediary Design
-
-CompliOpen is explicitly designed as a **non-intermediary system**:
-
-| | Capability |
-|---|---|
-| ❌ | Does NOT approve or reject transactions |
-| ❌ | Does NOT block, permit, or trigger execution |
-| ❌ | Does NOT route, match, or sequence orders |
-| ❌ | Does NOT custody assets or sign transactions |
-| ✅ | Produces independent compliance attestations only |
-| ✅ | Operates outside of execution environments |
-| ✅ | Outputs verifiable signals, not instructions |
-
-> CompliOpen outputs are informational and do not constitute transaction instructions or execution logic.
-
----
-
-## Core Function
-
-For each submitted transaction scenario ("intent"), CompliOpen:
-
-1. Evaluates inputs against deterministic rule sets
-2. Generates a canonical proof bundle (deterministic JSON)
-3. Computes a cryptographic hash (SHA-256 / Merkle root)
-4. Produces a signed attestation (Ed25519)
-5. Enables independent verification of the result
-6. Optionally anchors a commitment hash to a ledger (Canton)
-
-Each evaluation produces a **verifiable compliance state**, not an execution decision.
-
----
-
-## Evaluation Model
-
-CompliOpen uses deterministic rule evaluation:
-
-| Result | Meaning |
-|---|---|
-| `PASS` | All evaluated criteria satisfied |
-| `FAIL` | One or more criteria not satisfied |
-| `CONDITIONAL` | Partial satisfaction; additional review required |
-
-These values represent **rule evaluation results only**. They do not approve, deny, block, or permit transactions, and they do not influence execution.
-
-In API responses, `decision_type: "evaluation"` accompanies OSS rule evaluation responses (`POST /v1/demo/evaluate`) and `decision_type: "enforcement"` accompanies proof-chain responses (`POST /v1/intents`). This separation is intentional.
-
-> **Note on the `"enforcement"` label:** `decision_type: "enforcement"` is an **internal reference implementation label** used to distinguish proof-chain responses from standalone OSS rule evaluation responses. It does **not** mean CompliOpen authorizes, approves, denies, blocks, permits, or otherwise enforces a transaction. The response is a **proof-chain result** — a verifiable signal that external systems independently interpret. CompliOpen performs no execution or enforcement action.
-
----
-
-## Role in the Transaction Lifecycle
-
-CompliOpen operates **before execution and settlement**, as an independent attestation layer:
+These are design questions and direction, not claims that the new scaffold already verifies evidence freshness or authenticity.
 
 ```mermaid
 flowchart TD
-    TI(["📨 Transaction Intent"])
-
-    subgraph SG["CompliOpen — Independent Attestation Layer"]
-        direction LR
-        EVAL["Evaluate\nDeterministic Rule Engine"]
-        ATTEST["Attest\nEd25519 Signed Proof Bundle"]
-        ANCHOR["Anchor  ·  optional\nCanton Daml Commitment"]
-        EVAL --> ATTEST --> ANCHOR
-    end
-
-    EXT["External System\nInterprets Attestation"]
-    EXEC["Execution\nBroker-Dealer / Platform"]
-    CLR["Clearing & Settlement\nDTCC / CSD"]
-
-    TI --> EVAL
-    ANCHOR --> EXT
-    ATTEST -. verification available .-> EXT
-    EXT --> EXEC --> CLR
+    CDM["FINOS CDM\nCollateral Data"]
+    EVID["Evidence Package"]
+    VALID["Evidence Validation\n+ Normalization"]
+    GATE{"Evidence\nSufficient?"}
+    RULE["Authoritative Collateral\nEligibility Rule\nPending Source Validation"]
+    EVAL["Deterministic\nEvaluation"]
+    ASSESS["Eligibility Assessment"]
+    PROOF["Machine-Verifiable\nProof + Lineage"]
+    CDM --> VALID
+    EVID --> VALID
+    VALID --> GATE
+    GATE -->|Yes| RULE
+    RULE --> EVAL
+    EVAL --> ASSESS
+    ASSESS --> PROOF
+    GATE -->|No| ASSESS
 ```
 
-CompliOpen is **not** part of the execution path.
+> **The authoritative collateral-eligibility requirement for this FINOS CDM contribution has not yet been finalized. CompliOpen does not infer or invent eligibility criteria and does not substitute the repository’s existing ISDA, ISLA, or ICMA reference rules for the future authoritative rule.**
 
----
+The diagram is conceptual. Sufficient evidence does **not** bypass the absent-authority gate or yield an eligibility determination.
 
-## The Gap
+> **The authoritative collateral-eligibility requirement for this FINOS CDM contribution is pending source validation. No production eligibility determination should be made from the placeholder implementation.**
 
-The **Common Domain Model (CDM)** standardizes how lifecycle events, trade states, and workflows are represented across capital markets. It provides a shared, machine-readable vocabulary for *what* a financial event is.
+There are two intentionally separate CDM paths:
 
-What CDM does **not** prescribe is *how* the regulatory and market conditions associated with those events should be **deterministically validated** — and how the resulting evidence should be **cryptographically attested**.
-
-Today:
-
-- ✅ **CDM** standardizes lifecycle events and workflows
-- ⚠️ **Validation and attestation** remain fragmented across firms and platforms
-- ⚠️ Each participant **implements validation differently**, producing inconsistent results for the same event
-- ⚠️ Evidence is often **generated after execution**, as audit reconstruction rather than as a precondition
-- ⚠️ Tokenized markets — where workflows are programmable and atomic — require **deterministic validation** and **independently verifiable evidence** *before* state progression
-
-> CompliOpen explores how **regulatory and market conditions associated with CDM-defined events** can be evaluated **deterministically** and transformed into **cryptographically verifiable proof artifacts** *before* workflow progression.
-
----
-
-## Why This Matters
-
-Tokenized and programmable markets fundamentally change the role of validation. When settlement is instant, atomic, and machine-coordinated, post-hoc reconciliation is no longer sufficient. Validation must be:
-
-- **Deterministic** — identical inputs must yield identical outcomes, every time, on every implementation
-- **Interoperable** — rule evaluation must be portable across participants, venues, and infrastructure
-- **Reproducible** — outcomes must be re-derivable from the same inputs at any future point in time
-- **Independently verifiable** — third parties must be able to validate evidence without re-running or trusting the issuer
-
-CompliOpen is **complementary to CDM-defined workflows**: CDM describes *what* the lifecycle event is; CompliOpen provides a uniform, deterministic way to evaluate the conditions surrounding that event and emit cryptographic evidence that any party — issuer, custodian, regulator, counterparty — can verify independently.
-
----
-
-## CDM-Aligned Architecture
-
-CompliOpen is positioned as a **modular, workflow-independent layer** that sits alongside CDM and Canton / DAML, not inside them.
-
-| Layer | Responsibility |
+| Path | Current status |
 |---|---|
-| **CDM** | Standardized lifecycle and workflow representation |
-| **CompliOpen** | Deterministic validation and attestation |
-| **Canton / DAML** | Workflow coordination, synchronization, and optional anchoring |
+| Existing `backend/src/cdm/` provider boundary | Optional legacy API integration that validates and gates evidence before calling a configured provider. |
+| New `backend/src/contributions/finosCdm/collateralEligibility/` | Isolated contribution flow with caller-supplied, unvalidated mappings and evidence, a guarded versioned-rule boundary, assessment, unsigned proof, and replay verification. No authoritative rule is installed. |
 
-Key architectural properties:
+## What CompliOpen Is
 
-- **Modularity** — validation logic is decoupled from workflow orchestration; rule packs evolve independently of contract code
-- **Workflow independence** — CompliOpen never authors, advances, or blocks a workflow; it observes inputs and emits evidence
-- **Deterministic evaluation behavior** — given identical CDM-aligned inputs, the engine always produces the same proof bundle and the same attestation hash
+CompliOpen is:
 
-```mermaid
-flowchart TD
-    CDM["CDM TradeState / BusinessEvent"]
-    VAL["CompliOpen Validation"]
-    PROOF["Proof Bundle + Attestation"]
-    CANTON["Canton / DAML Coordination"]
-    EXT["External Systems / Workflow Progression"]
+- An open-source deterministic governance and evaluation implementation.
+- An evidence-backed assessment pattern that can consume CDM-aligned data.
+- A place to preserve provenance and produce machine-verifiable artifacts.
+- Deterministic where objective, versioned rules and trusted inputs are available.
+- Independently verifiable within the limits described in [Proof / Verification](#proof--verification).
+- Non-executing and external to transaction, settlement, and workflow control.
 
-    CDM --> VAL
-    VAL --> PROOF
-    PROOF --> CANTON
-    CANTON --> EXT
-```
+CompliOpen is **not**:
 
----
+- FINOS CDM itself or an authoritative ISDA, ISLA, or ICMA source.
+- A legal interpretation engine, broker-dealer, trading system, or transaction execution engine.
+- A substitute for legal or regulatory interpretation.
+- An AI eligibility decision system. AI may provide an optional explanation only; it never determines eligibility.
 
-## System Architecture
+An integrity hash or replay result shows consistency of a supplied record and pipeline. It does not prove that facts, evidence, mappings, source authority, or legal conclusions are authentic or current.
 
-```mermaid
-graph TD
-    subgraph FE["🖥️  FRONTEND — Next.js 15 / React / Tailwind"]
-        UI["Compliance Console"]
-        PROXY["API Proxy  /api/v1"]
-    end
+## Collateral Eligibility Architecture
 
-    subgraph BE["⚙️  BACKEND SERVICES — Node.js / Express / TypeScript"]
-        API["REST API\nserver.ts"]
-        CHAIN["Proof Chain Engine\nproof-chain.ts"]
-        ATT["Attestation Issuer\nattestation.ts  ·  Ed25519"]
-        OSS["Rule Engine\nossRuleEvaluator.ts"]
-        CANTON_A["Canton Adapter\ncanton-ledger.ts"]
-        DYN_A["Persistence Adapter\ndynamo-anchor.ts"]
-        BR["AI Reasoning\nbedrock-reasoning.ts"]
-    end
-
-    subgraph CANTON["🔷  CANTON NETWORK — Global Synchronizer"]
-        JAPI["JSON Ledger API v2\n:7575"]
-        SC["SettlementCommitment\nDaml Contract"]
-        AC["AnchoredCommitment\nDaml Contract"]
-    end
-
-    subgraph AWS["☁️  AWS"]
-        BEDROCK["Amazon Bedrock\nNova Micro"]
-        DDB["DynamoDB\nsg-commitment-registry"]
-        SQLITE["SQLite\nlocal fallback"]
-    end
-
-    UI -->|HTTP| PROXY
-    PROXY -->|fetch| API
-    API --> CHAIN --> ATT --> API
-    API --> OSS
-    API -->|anchor request| CANTON_A
-    API -->|reasoning| BR
-    CANTON_A -->|submit-and-wait| JAPI
-    JAPI --> SC
-    SC -->|AnchorCommitment choice| AC
-    CANTON_A -.->|fallback| DYN_A
-    DYN_A -.-> DDB
-    DYN_A -.-> SQLITE
-    BR --> BEDROCK
-```
-
-### Architecture Highlights
-
-- **Deterministic rule evaluation engine** — same inputs always produce the same result
-- **Canonical proof bundle generation** — deterministic JSON, SHA-256 Merkle root
-- **Cryptographic attestation** — Ed25519 signature over bundle root hash
-- **Independent verification flow** — any party can verify without re-running evaluation
-- **Optional ledger anchoring** — Canton JSON Ledger API v2 (`SettlementCommitment` Daml contract)
-- **Optional AI reasoning** — non-deterministic, non-decisional, does not affect attestation
-- **REST API** — standard HTTP integration
-
-### Technology Stack
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Commitment Rail** | Canton Network — Daml contracts | On-ledger commitment anchoring and lookup |
-| **Backend** | Node.js / Express / TypeScript | Proof chain, attestation, Canton + DynamoDB adapter |
-| **AI Reasoning** | AWS Bedrock — Amazon Nova Micro | Optional natural-language compliance explanation |
-| **Cryptography** | SHA-256 + Ed25519 | Bundle hashing and attestation signing |
-| **Frontend** | Next.js 15 / React / Tailwind CSS | Compliance console with real-time network status |
-| **Deployment** | AWS ECS (backend) + Vercel (frontend) | Production infrastructure |
-
----
-
-## Alignment with Industry Standards
-
-CompliOpen rule packs align with established market and regulatory standards. These standards define **market conditions**, not execution behavior — CompliOpen encodes them as deterministic evaluation logic so the same condition is interpreted consistently across participants.
-
-| Standard / Framework | Example Validation Scope | Reference Rule Pack | OSS Demo Status |
-|---|---|---|---|
-| **ISDA** | Margin sufficiency, counterparty validation | `ISDA_MARGIN_SUFFICIENCY` | Implemented in OSS demo (`rule_pack: "ISDA"`) |
-| **ISLA** | Collateral eligibility and coverage | `ISLA_COLLATERAL_COVERAGE` | Implemented in OSS demo (`rule_pack: "ISLA"`) |
-| **ICMA** | Repo collateral, haircut, maturity validation | `ICMA_REPO_COLLATERAL_SUFFICIENCY` | Implemented in OSS demo (`rule_pack: "ICMA"`) |
-| **GENIUS / CLARITY** | Reserve sufficiency, issuer conditions, asset classification | *(canonical proof-chain / policy-layer framing)* | Not available in `POST /v1/demo/evaluate` — represented in the canonical proof-chain reason-code framing and roadmap, not as an OSS demo rule pack |
-
-> These are **reference snippets only** — they demonstrate how standards-aligned validation can be encoded deterministically, not full legal or production-grade rule packs. Advanced rule orchestration, commercial logic, and full standards compliance remain out of scope for the open-source layer.
->
-> The current OSS demo rule packs exposed via `POST /v1/demo/evaluate` are **ISDA**, **ISLA**, and **ICMA**. **GENIUS** and **CLARITY** are referenced as policy-layer framing for the canonical proof chain and roadmap; they are not implemented as standalone OSS demo rule packs in this repository.
-
----
-
-## Settlement User Flow
-
-End-to-end lifecycle from intent submission through proof evaluation, on-chain anchoring, optional AI reasoning, and independent verification.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as 👤 User
-    participant FE as 🖥️ Frontend
-    participant API as ⚙️ Backend API
-    participant PC as Proof Chain
-    participant AT as Attestation
-    participant CL as Canton Ledger
-    participant AI as Bedrock AI
-
-    rect rgb(20, 45, 90)
-        Note over U,AT: PHASE 1 — INTENT SUBMISSION
-        U->>FE: Submit transaction scenario
-        FE->>API: POST /v1/intents
-        API->>PC: Execute 4-step proof chain
-        PC->>PC: Step 1 · Issuer Legitimacy
-        PC->>PC: Step 2 · Asset Classification
-        PC->>PC: Step 3 · Custody Conditions
-        PC->>PC: Step 4 · Reserve and Backing
-        PC-->>API: 4 proof steps + SHA-256 hashes
-        API->>AT: Seal bundle — Merkle root
-        AT->>AT: Sign with Ed25519
-        AT-->>API: Signed attestation
-        API-->>FE: decision + attestation + bundle_root_hash
-        FE-->>U: Compliance result displayed
-    end
-
-    rect rgb(20, 80, 45)
-        Note over U,CL: PHASE 2 — CANTON ANCHORING  (only when criteria satisfied)
-        U->>FE: Click Anchor Commitment
-        FE->>API: POST /v1/attestations/:id/anchor
-        API->>CL: POST /v2/commands/submit-and-wait
-        Note right of CL: Creates SettlementCommitment Daml contract
-        CL-->>API: transaction_id + contract_id
-        API-->>FE: Canton commitment confirmed
-        FE-->>U: On-chain attestation hash returned
-    end
-
-    rect rgb(70, 30, 70)
-        Note over U,AI: PHASE 3 — AI REASONING  (optional)
-        U->>FE: Request explanation
-        FE->>API: POST /v1/reasoning/:id
-        API->>AI: Invoke Nova Micro
-        AI-->>API: Natural-language compliance analysis
-        API-->>FE: Reasoning text
-        FE-->>U: Plain-language explanation
-    end
-
-    rect rgb(70, 50, 10)
-        Note over U,CL: PHASE 4 — INDEPENDENT VERIFICATION
-        U->>API: POST /v1/verify
-        API->>API: Verify Ed25519 signature
-        API->>CL: GET /v1/canton/commitments/:hash
-        CL-->>API: On-chain contract record
-        API-->>U: Verification result — valid or invalid
-    end
-```
-
----
-
-## Canonical Proof Chain
-
-| Step | Check | Key Inputs |
-|---|---|---|
-| 1 | **Issuer Legitimacy** | Issuer name, jurisdiction, license status |
-| 2 | **Asset Classification** | Asset type, regulatory category, ruleset |
-| 3 | **Custody Conditions** | Custodian, segregation status, encumbrance |
-| 4 | **Reserve & Backing** | Reserve ratio (must be ≥ 1.0), audit date, backing assets |
-
-Each step produces a SHA-256 hash of its normalized inputs. The chain never changes order and produces reproducible, independently verifiable results.
+The target architecture is:
 
 ```mermaid
 flowchart LR
-    IN(["Settlement Intent\nJSON Input"])
+    CDM["CDM collateral data"]
+    SOURCES["Evidence sources"]
+    ADAPTER["CDM / evidence adapter"]
+    VALIDATE["Evidence validation"]
+    NORMALIZE["Normalization"]
+    SUFF["Evidence sufficiency"]
+    AUTH["Authoritative rule boundary\nsource validation pending"]
+    EVAL["Deterministic evaluation"]
+    ASSESS["Assessment"]
+    PROOF["Unsigned proof artifact"]
+    VERIFY["Independent verification"]
+    ATTEST["Optional cryptographic attestation"]
+    CANTON["Optional Canton commitment"]
+    NDET["Absent authority:\nnon-determination"]
+    EXPLAIN["Optional explanation\n(non-decisional)"]
 
-    subgraph CHAIN["Canonical Proof Chain — Fixed Order · Deterministic"]
-        S1["Step 1\nIssuer Legitimacy\nname · jurisdiction · license"]
-        S2["Step 2\nAsset Classification\ntype · category · ruleset"]
-        S3["Step 3\nCustody Conditions\ncustodian · segregation · encumbrance"]
-        S4["Step 4\nReserve and Backing\nratio ≥ 1.0 · audit date · assets"]
-    end
-
-    H1["SHA-256\nHash 1"]
-    H2["SHA-256\nHash 2"]
-    H3["SHA-256\nHash 3"]
-    H4["SHA-256\nHash 4"]
-
-    MR["Bundle Root Hash\nSHA-256 of H1 ‖ H2 ‖ H3 ‖ H4"]
-
-    DEC{"All steps\nPASS?"}
-
-    ATT["Ed25519 Attestation\nIssued\nproof-chain result:\ncriteria satisfied"]
-    NOATT["No Attestation\nproof-chain result:\ncriteria not satisfied"]
-    ANCHOR["Canton Anchor\nSettlementCommitment\nDaml Contract"]
-
-    IN --> S1 --> H1
-    IN --> S2 --> H2
-    IN --> S3 --> H3
-    IN --> S4 --> H4
-    H1 & H2 & H3 & H4 --> MR
-    MR --> DEC
-    DEC -->|Yes| ATT
-    DEC -->|No| NOATT
-    ATT --> ANCHOR
+    CDM --> ADAPTER
+    SOURCES --> ADAPTER
+    ADAPTER --> VALIDATE --> NORMALIZE --> SUFF --> AUTH
+    AUTH --> EVAL --> ASSESS --> PROOF --> VERIFY
+    PROOF -. optional extension, not wired .-> ATTEST -. optional extension, not wired .-> CANTON
+    ASSESS -. optional explanation only .-> EXPLAIN
+    AUTH -. no installed authoritative rule .-> NDET
 ```
 
----
+The new contribution's proof flow is local and unsigned. It is not wired to the legacy attestation, Canton, Bedrock, or `/v1/verify` endpoints. The dotted paths are conceptual optional extensions, not implemented connections. The existing provider path and the new contribution path are not interchangeable executable pipelines.
 
-## Cryptographic Design
+The architectural stages are deliberately explicit:
 
-- **Bundle Root Hash** — SHA-256 over concatenated proof step hashes
-- **Attestation Signature** — Ed25519 over `{bundle_root_hash}:{intent_id}:{issued_at}`
-- **On-ledger Contract** — Canton `contractId` and `transaction_id` for `SettlementCommitment` / `AnchoredCommitment` records
-- **Privacy** — only hashes committed on-chain; raw settlement data never leaves the originating environment
+1. **Governed subject** — a collateral or collateral arrangement represented by a source reference; identity remains unresolved in the new artifact.
+2. **Current operational state** — facts and evidence observations captured for an evaluation context.
+3. **Applicable requirement** — a future validated collateral-eligibility requirement.
+4. **Evidence** — source claims supporting the evaluation.
+5. **Evidence validation and normalization** — structural processing whose unresolved authenticity and freshness remain visible.
+6. **Deterministic evaluation** — a versioned rule, once one is admitted.
+7. **Assessment and decision** — an explicit outcome, including non-determination.
+8. **Proof artifact and verification** — a reproducible record of inputs, lineage, versions, context, and result.
 
----
+## Evidence-Backed Evaluation
 
-## Deterministic Evaluation
+The new contribution accepts an adapter envelope, normalized facts, and evidence records. Optional mappings are caller-supplied and explicitly `CALLER_SUPPLIED_UNVALIDATED`; source validation is `PENDING_SOURCE_VALIDATION`. Evidence is structurally classified as `UNVALIDATED` or `INVALID`. Registration of a rule does not validate CDM mappings or evidence.
 
-> **`same input → same output → same proof`**
+Evidence sufficiency is a gate in the architecture, not a claim that the repository has established a normative evidence policy for the future rule. An unavailable, malformed, conflicting, or otherwise unverifiable input must not be converted into a positive or negative eligibility result.
 
-Determinism is the foundational property of CompliOpen. Every rule evaluation is a pure function of its declared inputs and a versioned, machine-readable rule pack. There is no hidden state, no model inference, and no time-dependent behavior in the evaluation path.
+## Authoritative Rule Status
 
-This produces four properties that matter for tokenized financial infrastructure:
+The exact source authority, document and version, provision, effective date, jurisdiction, scope, applicability, required inputs, and required evidence are still being identified and reviewed. No existing ISDA, ISLA, or ICMA rule is presented as that authority. The mock provider is never authoritative.
 
-- **Reproducible validation** — any party, at any time, can re-run the evaluation against the same inputs and obtain the same proof bundle and the same root hash
-- **Interoperability** — because evaluation is fully specified, results are portable across implementations, vendors, and venues
-- **Reduced interpretation variance** — the same regulatory or market condition is evaluated identically across participants, eliminating per-firm interpretation drift
-- **Independent verification** — third parties can verify the cryptographic attestation without trusting, contacting, or re-executing the issuer
+The rule contract can represent `ruleId`, `ruleVersion`, `sourceAuthority`, `sourceDocument`, `sourceProvision`, `effectiveDate`, `jurisdiction`, `scope`, applicability conditions, required inputs, required evidence, reason-code declarations, evaluation callbacks, and provenance. Unknown values remain explicitly unresolved or null. A draft or template cannot be registered as executable; registration requires an exact reviewed metadata snapshot and application-controlled source-review admission. That admission validates structure and matching metadata, not source truth or reviewer authenticity.
 
-Determinism is what makes CompliOpen suitable as a **shared validation primitive** for CDM-aligned workflows.
+Until a validated version is installed, the new evaluator returns:
 
----
+```text
+decision: RULE_NOT_CONFIGURED
+reason:   AUTHORITATIVE_RULE_NOT_CONFIGURED
+rule:     null
+```
+
+Architecture was built before final rule selection so evidence, provenance, deterministic evaluation, assessment, and proof boundaries can evolve independently. Human review is still required to identify the authoritative source, provision, applicability, evidence requirements, and confirmed CDM mappings.
+
+## Assessment Model
+
+### Existing CDM provider assessment
+
+The existing provider path uses these statuses:
+
+| Status | Meaning |
+|---|---|
+| `SATISFIED` | A configured provider returned a positive result accepted by current response validation. |
+| `NOT_SATISFIED` | A configured provider returned an accepted negative result. |
+| `NOT_EVALUABLE` | Evidence is missing, invalid, stale, insufficient, or the provider is unavailable, malformed, or unverifiable. |
+| `MANUAL_REVIEW` | Evidence conflicts, duplicate IDs, or collateral/specification mismatches require review. |
+
+The legacy bridge maps these to `eligible`, `ineligible`, `indeterminate_missing_evidence`, `indeterminate_conflicting_evidence`, or `technical_error`. Provider outcomes and response verification do not prove that a selected authoritative rule has been validated. They do not mean legal compliance or transaction authorization.
+
+### New contribution assessment
+
+The isolated namespace preserves these decisions:
+
+`RULE_NOT_CONFIGURED`, `SATISFIED`, `NOT_SATISFIED`, `INSUFFICIENT_EVIDENCE`, and `MANUAL_REVIEW_REQUIRED`.
+
+No positive or negative determination is produced without an admitted rule. The new namespace does not claim the existing provider's freshness policy; its source validation, mappings, and evidence remain explicitly unvalidated. Reason codes and fields are retained rather than collapsed or renamed.
+
+## Proof / Verification
+
+`createCollateralEligibilityProof` records a strict JSON snapshot containing a source-reference-only subject, operational state, normalized facts and evidence references, diagnostics, replay inputs, exact context, rule metadata, and assessment. `verifyCollateralEligibilityProof` treats the artifact as untrusted data, checks supported versions and its integrity commitment, and can replay only with a trusted, exact-version registered rule.
+
+The unsigned artifact uses versioned canonical JSON and SHA-256. Object keys are sorted and array order is preserved; unsupported JSON values are rejected. Replay requires the same normalized facts and evidence plus the exact rule, pipeline, mapping, and evaluation-context versions. If the rule is unavailable or authority is not configured, verification can establish record integrity or unavailable replay, not eligibility.
+
+These checks do **not** prove source authenticity, evidence freshness, CDM mapping correctness, legal authority, regulatory compliance, or eligibility. A recomputed hash is not an authenticated origin or external trust anchor. Legacy attestations are different: they use runtime timestamps and external proof-chain services, so no blanket claim that identical inputs always produce an identical attestation hash is made.
+
+## CDM Provider Boundary
+
+The existing `backend/src/cdm/` boundary is an optional assessment added to a legacy sealed bundle when `cdm_eligibility_request` is supplied:
+
+```text
+cdm_eligibility_request
+ → evidence validation and normalization
+ → evidence lineage
+ → gated provider
+ → normalized assessment
+ → fail closed
+```
+
+It accepts:
+
+- `collateral_reference`
+- `specification`, or `specification_reference` (which requires a resolver)
+- `evidence_package` with flat `evidence`
+- legacy `query_evidence`
+
+The configured function string is `cdm.product.collateral.CheckEligibilityByDetails`. Local adapter DTOs include `EligibleCollateralSpecification`, `EligibilityQuery`, and `CheckEligibilityResult`. These mappings and provider metadata do not establish a verified FINOS schema or authoritative requirement.
+
+The assessment preserves `assessment_type`, `legacy_status`, `reason_codes`, `evidence_reference_ids`, accepted/rejected/submitted evidence, `query`, `query_hash`, `evidence_lineage_hash`, `evidence_policy`, and nullable provider/model versions. It also retains verification metadata and provider result summaries where available.
+
+### Providers and configuration
+
+`ExternalCdmEligibilityProvider` is used for a configured external endpoint. Responses must pass the implementation's validation and verification checks; unavailable, malformed, or unverified responses fail closed. `MockCdmEligibilityProvider` returns explicitly configured canned fixtures only.
+
+> **TEST / REFERENCE ONLY — NOT AN AUTHORITATIVE ELIGIBILITY ENGINE**
+
+| Variable | Purpose |
+|---|---|
+| `CDM_ELIGIBILITY_ENDPOINT` | External provider endpoint. |
+| `CDM_ELIGIBILITY_AUTH_TOKEN` | Optional provider bearer token. |
+| `CDM_ELIGIBILITY_AUTH_HEADER` | Optional provider auth header. |
+| `CDM_ELIGIBILITY_TIMEOUT_MS` | External request timeout; default is 8000 ms. |
+| `CDM_ELIGIBILITY_PROVIDER_VERSION` | Optional provider version metadata. |
+| `CDM_MODEL_VERSION` | Optional CDM model version metadata. |
+| `CDM_RESPONSE_HMAC_SECRET` | Required when an external endpoint is configured; supports response verification, not real-world truth or authority. |
+| `CDM_ELIGIBILITY_PROVIDER=mock` | Selects the local fixture provider only. |
+| `CDM_ELIGIBILITY_MOCK_RESPONSE` | JSON canned `CheckEligibilityResult` fixture. |
+
+## Existing Reference Rules
+
+The original open-source rule implementations remain available and independent:
+
+| Rule family | Reference implementation |
+|---|---|
+| ISDA | Margin sufficiency and related collateral checks. |
+| ISLA | `ISLA_COLLATERAL_COVERAGE` coverage check and the separately documented `ISLA_COLLATERAL_ELIGIBILITY` reference rule where applicable. Coverage is not synonymous with eligibility. |
+| ICMA | Repo collateral sufficiency. |
+
+These are deterministic examples from SettlementGuard, not the future authoritative FINOS rule. Existing reason codes, examples, and the legacy `POST /v1/demo/evaluate` request shape remain reference/demo behavior. Verify any sample against the current schema before using it.
+
+```bash
+curl -X POST http://localhost:3001/v1/demo/evaluate \
+  -H 'Content-Type: application/json' \
+  -d '{"rule_id":"ISDA_MARGIN_SUFFICIENCY","inputs":{}}'
+```
+
+The demo endpoint and payload above are legacy/reference material; the current FINOS contribution does not expose a replacement HTTP route.
+
+## Original SettlementGuard Reference Implementation
+
+This section retains the historical four-step chain and related artifacts. It is not the current FINOS/CDM model.
+
+### Four-step proof chain
+
+1. **Issuer Legitimacy**
+2. **Asset Classification**
+3. **Custody Conditions**
+4. **Reserve &amp; Backing**
+
+The chain normalizes inputs, hashes each step with SHA-256, seals a canonical bundle, and derives legacy `ALLOW` or `DENY` decision records. Existing `decision_type: "evaluation"` and `decision_type: "enforcement"` labels are preserved where runtime compatibility requires them. The latter is an internal proof-chain label, not authorization to transact or control of settlement.
+
+Historical stablecoin and Treasury scenarios, settlement-intent flows, GENIUS/CLARITY policy framing, and the original component architecture remain reference context. GENIUS and CLARITY are not standalone implemented FINOS demo rule packs here.
+
+### Legacy architecture and optional explanation
+
+The original UI and backend include the proof chain, Ed25519 attestation, optional Canton/Daml anchoring, persistence fallback, and optional Bedrock explanation. Bedrock is outside the deterministic decision path and cannot determine eligibility. CompliOpen does not route, match, custody, approve, reject, block, or permit transactions.
 
 ## API Reference
 
-> Initial OpenAPI documentation: [`docs/openapi.yaml`](docs/openapi.yaml)
+### Legacy HTTP surface
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/health` | GET | Backend health check |
-| `/v1/intents` | POST | Submit a settlement intent for proof evaluation |
-| `/v1/intents` | GET | List persisted intent records |
-| `/v1/intents/:id` | GET | Fetch a specific intent record |
-| `/v1/intents/preset/:presetId` | POST | Run a predefined settlement scenario |
-| `/v1/verify` | POST | Verify attestation signature and optional on-chain presence |
-| `/v1/attestations/:id/anchor` | POST | Anchor an attestation commitment to Canton |
-| `/v1/reasoning/:id` | POST | Generate Bedrock-backed compliance reasoning for an intent |
-| `/v1/presets` | GET | List available demo presets |
-| `/v1/public-key` | GET | Fetch the active public verification key and metadata |
-| `/v1/canton/status` | GET | Canton network / configuration status |
-| `/v1/canton/commitments/:attestationHash` | GET | Lookup a commitment by attestation hash |
-| `/v1/demo/evaluate` | POST | Evaluate an OSS rule pack independently of the proof chain |
+The backend is an Express service. Important legacy routes include:
 
-### Example Flow
+| Route | Purpose |
+|---|---|
+| `POST /v1/intents` | Submit a proof-chain intent. |
+| `GET /v1/intents/:id` | Read an intent and its bundle. |
+| `POST /v1/verify` | Verify a legacy signed proof/attestation. |
+| `POST /v1/attestations/:id/anchor` | Optionally anchor an attestation. |
+| `POST /v1/reasoning/:id` | Request optional non-decisional explanation. |
+| `GET /v1/audit/:id` | Read the audit record. |
+| `POST /v1/demo/evaluate` | Evaluate an existing reference rule pack. |
+| `GET /v1/canton/status` | Report configured Canton readiness. |
 
-```bash
-# 1. Submit a settlement intent
-POST /v1/intents
-→ evaluate rule pack
-→ generate proof bundle (SHA-256 Merkle root)
-→ sign attestation (Ed25519)
-→ return result with decision and signed attestation
+The new collateral-eligibility proof artifact is currently an isolated module API, not an HTTP route and not a `/v1/verify` artifact.
 
-# 2. Verify independently
-POST /v1/verify
-→ validate Ed25519 signature
-→ validate bundle integrity
+### Authentication and scopes
 
-# 3. Anchor to Canton (optional, only when proof-chain criteria are satisfied)
-POST /v1/attestations/:id/anchor
-→ submit SettlementCommitment Daml contract
-→ return canton transaction_id and contract_id
-```
+The legacy API supports a demo bearer token and JWT configuration. Static bearer-token clients receive wildcard `sg:admin`; JWT clients must carry an appropriate scope.
 
----
+| Scope | Legacy routes |
+|---|---|
+| `sg:intents:write` | `POST /v1/intents`, preset intent routes |
+| `sg:intents:read` | `GET /v1/intents`, `GET /v1/intents/:id` |
+| `sg:verify:read` | `POST /v1/verify` |
+| `sg:attestations:write` | `POST /v1/attestations/:id/anchor` |
+| `sg:anchor:write` | Backward-compatible alias for attestation anchoring |
+| `sg:reasoning:read` | `POST /v1/reasoning/:id` |
+| `sg:audit:read` | `GET /v1/audit/:id` |
+| `sg:demo:evaluate` | `POST /v1/demo/evaluate` |
+| `sg:admin` | Wildcard compatibility scope |
 
-## Demo Rule Pack API
-
-`POST /v1/demo/evaluate` provides a standalone entry point for testing OSS rule snippets without submitting a full intent.
-
-```json
-{ "rule_pack": "ISDA | ISLA | ICMA", "payload": { ... } }
-```
-
-**ISDA — margin sufficiency** (`examples/isda-margin.json`)
-```json
-{ "rule_pack": "ISDA", "payload": { "required_margin": 100000, "posted_collateral_value": 110000 } }
-```
-
-**ISLA — collateral coverage** (`examples/isla-collateral.json`)
-```json
-{ "rule_pack": "ISLA", "payload": { "collateral_value": 1050000, "loan_value": 1000000, "haircut": 0.02 } }
-```
-
-**ICMA — repo collateral sufficiency** (`examples/icma-repo.json`)
-```json
-{ "rule_pack": "ICMA", "payload": { "purchase_price": 1000000, "collateral_value": 1050000, "haircut": 0.02 } }
-```
-
-A passing evaluation returns `"decision": "PASS"` with an empty `reason_codes` array. A failing evaluation returns `"decision": "FAIL"` or `"CONDITIONAL"` with one or more reason codes.
-
----
-
-## Example Scenarios
-
-| Scenario | Asset | Attestation | Commitment | Reason |
-|---|---|---|---|---|
-| **Stablecoin PASS** | USDX-002 | Issued | Anchored | Reserve ratio 1.02 ≥ 1.0, custody valid |
-| **Treasury PASS** | USTB-2026-002 | Issued | Anchored | CUSIP verified, position available |
-| **Stablecoin FAIL** | USDX-001 | Not issued | Not anchored | Reserve ratio 0.97 < 1.0 threshold |
-| **Treasury FAIL** | USTB-2026-001 | Not issued | Not anchored | Custody position flagged invalid |
-
----
+See `backend/src/middleware/auth.ts` for enforcement. Do not place deployment secrets in requests or source.
 
 ## Canton Integration
 
-CompliOpen anchors compliance commitments to Canton using Daml contracts defined in `canton/daml/SettlementGuard/CommitmentRegistry.daml`. The backend calls the Canton JSON Ledger API v2.
+Canton/Daml is an optional legacy commitment and anchoring integration, not a requirement for the standalone new contribution. The client uses Canton JSON Ledger API v2, with `SettlementCommitment` and `AnchoredCommitment` contracts under `canton/daml/SettlementGuard/`. LocalNet setup and DAR/package instructions are in [`canton/README.md`](canton/README.md) and [`docs/DEVNET.md`](docs/DEVNET.md).
 
-- **Submit** — `POST /v2/commands/submit-and-wait` creates a `SettlementCommitment` contract
-- **Lookup** — `POST /v2/state/active-contracts` queries active commitments by attestation hash
-- **Status** — `GET /livez` and `GET /v2/state/ledger-end` for health and ledger offset
+When a configured ledger is unavailable, the existing commitment registry can fall back to DynamoDB/SQLite. `CANTON_NETWORK_PROFILE=devnet` is informational; DevNet support is not proof of a live deployment. The repository's readiness documentation requires a real validator health check and a successful `SettlementCommitment` round trip before DevNet is called live.
 
-### LocalNet vs DevNet
-
-CompliOpen is Canton-ready and can anchor to any configured Canton JSON Ledger API environment. The same backend code paths work against either a local sandbox or a shared DevNet participant — only the connection settings change.
-
-| Environment | Purpose | Requirements |
-|---|---|---|
-| **LocalNet** | Local development and self-contained testing. Runs entirely on the developer's machine via `dpm sandbox` or the CN Quickstart LocalNet. | None beyond the local toolchain (JDK 17+, DPM, Docker for CN Quickstart). |
-| **DevNet** | Shared Canton Network development environment for cross-org integration. | Access to a validator / sponsoring Super Validator and network onboarding credentials (party allocations, JWT, JSON Ledger API endpoint). |
-
-> **Note:** DevNet is **not** considered live for this project unless a `SettlementCommitment` contract has been successfully created on DevNet. Until then, treat DevNet support as configured-but-unverified.
-
-See [docs/canton-devnet-readiness.md](docs/canton-devnet-readiness.md) for the DevNet readiness checklist and onboarding details.
-
-To check current readiness and run an anchor smoke test against the configured environment:
-
-```bash
-cd backend
-npm run canton:readiness
-npm run canton:anchor-smoke
-```
-
-### Canton Environment Variables
-
-| Variable | Description |
-|---|---|
-| `CANTON_LEDGER_API_URL` | Canton JSON API base URL (default: `http://localhost:7575`) |
-| `CANTON_SUBMITTER_PARTY` | Submitter party ID (from `canton/setup-canton.sh`) |
-| `CANTON_CUSTODIAN_PARTY` | Custodian party ID (from `canton/setup-canton.sh`) |
-| `CANTON_PACKAGE_ID` | DAR package hash (from `canton/setup-canton.sh`) |
-
-If these are not set, anchoring falls back to DynamoDB / SQLite for local operation.
-
-### Canton Commitment Lifecycle
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> IntentSubmitted : POST /v1/intents
-
-    IntentSubmitted --> ProofChainRunning : Proof chain executes
-    ProofChainRunning --> BundleSealed : 4 steps evaluated + hashed
-    BundleSealed --> AttestationIssued : criteria satisfied
-    BundleSealed --> Denied : criteria not satisfied
-
-    AttestationIssued --> AnchorPending : POST /v1/attestations/:id/anchor
-    AnchorPending --> SettlementCommitment : Canton submit-and-wait OK
-    SettlementCommitment --> AnchoredCommitment : AnchorCommitment choice custodian co-signs
-    AnchoredCommitment --> Verified : POST /v1/verify or GET /canton/commitments/:hash
-
-    AnchorPending --> DynamoFallback : Canton unavailable
-    DynamoFallback --> Verified : DynamoDB lookup
-
-    Denied --> [*]
-    Verified --> [*]
-```
-
-### Local Dev Option A — DPM Sandbox
-
-Prereqs: JDK 17+, DPM (`curl https://get.digitalasset.com/install/install.sh | sh`, then `export PATH="$HOME/.dpm/bin:$PATH"`).
-
-```bash
-# Build the Daml DAR
-cd canton && dpm build
-
-# Start the Canton sandbox (JSON API on :7575, gRPC on :6866)
-dpm sandbox &
-
-# Provision parties, upload DAR, write backend/.env.canton
-chmod +x setup-canton.sh && ./setup-canton.sh
-
-# Source env and start backend
-set -a && source ../backend/.env.canton && set +a
-cd ../backend && npm run dev
-
-# Run end-to-end tests
-API_BEARER_TOKEN=... node backend/scripts/e2e-test.mjs http://localhost:3001
-```
-
-### Local Dev Option B — CN Quickstart LocalNet
-
-For a full multi-participant network with wallet and scan UIs:
-
-```bash
-git clone https://github.com/digital-asset/cn-quickstart
-cd cn-quickstart
-make install && make start
-```
-
-JSON Ledger API: `http://json-ledger-api.localhost` (port 7575 on some builds).
-Set `CANTON_LEDGER_API_URL=http://json-ledger-api.localhost` and run the provision/backend steps above.
-
----
+Retained compatibility names include `sg-commitment-registry`, `sg-participant-01`, `canton/daml/SettlementGuard`, and the existing DAR names. They are not renamed by this contribution.
 
 ## Running Locally
 
@@ -608,297 +324,142 @@ Set `CANTON_LEDGER_API_URL=http://json-ledger-api.localhost` and run the provisi
 ```bash
 cd backend
 npm install
+cp .env.example .env
+npm run dev
+```
+
+The default backend listens on port `3001`. For a build and the repository's local checks:
+
+```bash
+cd backend
 npm run build
-npm start          # http://localhost:3001
+npm test
 ```
 
-Required environment variables (see `.env.example`):
+`npm test` runs the build, Canton status check, CDM provider check, CDM assessment check, and contribution check. Separate scripts cover E2E, CDM integration, Canton readiness, and Canton anchoring smoke tests:
 
-```env
-SG_SIGNING_SEED_B64=your_base64_32_byte_seed
-SG_KEY_ID=sg-demo-key-01
-SG_KEY_VERSION=v1
-API_BEARER_TOKEN=shared_demo_token
-JSON_BODY_LIMIT=32kb
-POST_RATE_LIMIT_MAX=60
-AWS_REGION=us-east-2
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-BEDROCK_MODEL_ID=us.amazon.nova-micro-v1:0
-
-# Canton JSON Ledger API (set after running canton/setup-canton.sh)
-CANTON_LEDGER_API_URL=http://localhost:7575
-CANTON_SUBMITTER_PARTY=
-CANTON_CUSTODIAN_PARTY=
-CANTON_PACKAGE_ID=
-CANTON_DOMAIN=global-synchronizer.canton.network
-CANTON_PARTICIPANT=sg-participant-01
-DYNAMO_TABLE=sg-commitment-registry
+```bash
+npm run test:e2e
+npm run test:cdm-integration
+npm run canton:readiness
+npm run canton:anchor-smoke
 ```
 
-### CDM collateral eligibility provider boundary
-
-CompliOpen can optionally attach a `cdm_eligibility_assessment` to the sealed bundle when
-`cdm_eligibility_request` is supplied. Phase 3 keeps CompliOpen on an adapter boundary:
-it deterministically validates evidence sufficiency, builds a normalized `EligibilityQuery` only
-when all required fields are supported by fresh non-conflicting evidence, and then calls a provider
-for `cdm.product.collateral.CheckEligibilityByDetails`. CompliOpen does **not** recreate the
-CDM eligibility algorithm locally.
-
-- `ExternalCdmEligibilityProvider` sends the local adapter DTOs (`EligibleCollateralSpecification`
-  plus `EligibilityQuery`) to a configured HTTP endpoint and accepts a
-  `CheckEligibilityResult`-compatible response.
-- `MockCdmEligibilityProvider` is a **TEST/REFERENCE ONLY** provider for local demos and tests.
-  It returns explicitly configured canned fixtures and must not be treated as a real CDM engine.
-- `evaluateEvidenceBackedCollateralEligibility(...)` returns one of four normalized assessment
-  states: `SATISFIED`, `NOT_SATISFIED`, `NOT_EVALUABLE`, or `MANUAL_REVIEW`.
-- Evidence gate failures never call the provider. Missing/invalid/stale/insufficient evidence
-  returns `NOT_EVALUABLE`; conflicting evidence, duplicate evidence IDs, or collateral/specification
-  reference mismatches return `MANUAL_REVIEW`.
-- Provider failures are returned as explicit `NOT_EVALUABLE` assessments with
-  `CDM_EVALUATION_UNAVAILABLE`; CompliOpen never infers eligibility from an unavailable,
-  malformed, or unverified provider response.
-- Assessments are evidence and workflow signals only. They do **not** authorize, block, or execute
-  transactions.
-
-Assessment payload highlights:
-
-- `assessment_type` is always `CDM_COLLATERAL_ELIGIBILITY`.
-- `legacy_status` is included as a bridge for Phase 2 consumers that still expect the earlier
-  lowercase status family.
-- `reason_codes` are deterministic and ordered from evidence/manual-review faults through provider
-  faults to final eligibility (`CDM_COLLATERAL_ELIGIBLE` / `CDM_COLLATERAL_INELIGIBLE`).
-- `evidence_reference_ids`, `accepted_evidence`, `rejected_evidence`, `submitted_evidence`,
-  `query`, `query_hash`, and `evidence_lineage_hash` preserve evidence lineage.
-- `evidence_policy` currently requires `provenance` and `integrity_hash`, rejects future timestamps,
-  and treats evidence as fresh when `observed_at` age is less than or equal to the configured
-  `max_evidence_age_ms` boundary.
-- `cdm_model_version` and `provider_version` are `null` when the provider was not successfully
-  invoked or when trustworthy metadata is unavailable; they are never fabricated.
-
-`cdm_eligibility_request` accepts:
-
-- `collateral_reference`
-- either `specification` or `specification_reference` (reference-only requests require an explicit
-  resolver)
-- `evidence_package` with `package_id?`, `collateral_reference?`, and flat `evidence[]`
-- legacy `query_evidence` remains accepted for backward compatibility; when used, the assessment
-  keeps `evidence_package_id: null` rather than inventing one
-
-Relevant environment variables:
-
-| Variable | Description |
-|---|---|
-| `CDM_ELIGIBILITY_ENDPOINT` | External provider URL for collateral eligibility evaluation |
-| `CDM_ELIGIBILITY_AUTH_TOKEN` | Optional bearer token for the external provider |
-| `CDM_ELIGIBILITY_AUTH_HEADER` | Optional full `Authorization` header value |
-| `CDM_ELIGIBILITY_TIMEOUT_MS` | External provider timeout in milliseconds |
-| `CDM_ELIGIBILITY_PROVIDER_VERSION` | Local metadata version for the provider wrapper |
-| `CDM_MODEL_VERSION` | CDM model version recorded in provider metadata |
-| `CDM_RESPONSE_HMAC_SECRET` | Shared secret required for configuring an external provider; external responses fail closed if they cannot be verified |
-| `CDM_ELIGIBILITY_PROVIDER=mock` | Enables the mock **TEST/REFERENCE ONLY** provider |
-| `CDM_ELIGIBILITY_MOCK_RESPONSE` | JSON-encoded canned `CheckEligibilityResult` fixture for the mock provider |
-
-### Authentication & route scopes
-
-The backend supports two authentication modes (configure at least one):
-
-- **Static bearer token** (`API_BEARER_TOKEN`) — intended for local development and the demo. Clients sending `Authorization: Bearer $API_BEARER_TOKEN` are granted the `sg:admin` wildcard scope, which satisfies every per-route scope check. This preserves backward compatibility — existing demo clients require **no scope claims**.
-- **JWT** (`SG_JWT_SECRET`, `SG_JWT_ISSUER`, `SG_JWT_AUDIENCE`) — for non-demo deployments. Tokens must carry a `scope` (or `scopes`) claim with the per-route scope listed below (or `sg:admin`).
-
-Required scopes per route (enforced by `requireScope` in `backend/src/middleware/auth.ts`):
-
-| Method & path | Required scope |
-|---|---|
-| `POST /v1/intents`, `POST /v1/intents/preset/:presetId` | `sg:intents:write` |
-| `GET  /v1/intents`, `GET /v1/intents/:id` | `sg:intents:read` |
-| `POST /v1/verify` | `sg:verify:read` |
-| `POST /v1/attestations/:id/anchor` | `sg:attestations:write` (alias: `sg:anchor:write`) |
-| `POST /v1/reasoning/:id` | `sg:reasoning:read` |
-| `GET  /v1/audit/:id` | `sg:audit:read` |
-| `POST /v1/demo/evaluate` | `sg:demo:evaluate` |
-
-`sg:admin` satisfies any required scope.
+These commands describe repository scripts; no claim is made here that they have been run in every environment.
 
 ### Frontend
+
+In a second terminal, start the retained Next.js demo UI:
 
 ```bash
 cd frontend
 npm install
-BACKEND_API_URL=http://localhost:3001 npm run dev
-# Opens at http://localhost:3000
+npm run dev
 ```
 
----
+The frontend is a legacy/reference console and proxy. It is not required for the isolated contribution flow.
+
+### Canton LocalNet
+
+For the retained Canton/Daml integration, use the documented DPM sandbox path:
+
+```bash
+cd canton
+dpm build
+dpm sandbox &
+chmod +x setup-canton.sh
+./setup-canton.sh
+set -a && source ../backend/.env.canton && set +a
+cd ../backend
+npm run dev
+```
+
+Alternatively, Canton Network's Quickstart LocalNet can provide a JSON Ledger API. See [`canton/README.md`](canton/README.md) for prerequisites, party allocation, DAR upload, and the `http://localhost:7575` / `json-ledger-api.localhost` options. These are legacy optional integrations, not requirements for the new local proof flow.
+
+### Environment
+
+Use [`backend/.env.example`](backend/.env.example) as the source of truth. Relevant retained names include `SG_SIGNING_SEED_B64`, `SG_KEY_ID`, `SG_KEY_VERSION`, `SG_JWT_*`, and `sg:*` scopes. CDM provider variables are listed in [CDM Provider Boundary](#cdm-provider-boundary). AWS and Canton are optional for local legacy features and are not required for the isolated collateral-eligibility flow.
 
 ## Project Structure
 
-```
-dtcch-2026-compliledger/
-├── backend/
-│   └── src/
-│       ├── server.ts                # Express API — all REST endpoints
-│       ├── canton-ledger.ts         # Canton JSON Ledger API v2 integration
-│       ├── proof-chain.ts           # 4-step canonical proof chain
-│       ├── attestation.ts           # Ed25519 attestation issuance
-│       ├── bundle.ts                # Proof bundle sealing
-│       ├── crypto.ts                # SHA-256 + Ed25519 utilities
-│       ├── bedrock-reasoning.ts     # AWS Bedrock Nova Micro AI reasoning
-│       ├── dynamo-anchor.ts         # DynamoDB / SQLite fallback persistence
-│       ├── db.ts                    # SQLite intent persistence
-│       ├── types.ts                 # Shared type definitions
-│       ├── engine/
-│       │   ├── ossRuleEvaluator.ts  # OSS rule evaluation entry point
-│       │   └── ruleRegistry.ts      # Rule pack registry (ISDA, ISLA, ICMA)
-│       └── rules/
-│           ├── isda/margin.ts       # ISDA margin sufficiency snippet
-│           ├── isla/collateral.ts   # ISLA collateral coverage snippet
-│           └── icma/repo.ts         # ICMA repo collateral sufficiency snippet
-├── canton/
-│   ├── daml.yaml                    # DPM project config (SDK 3.4.11)
-│   ├── setup-canton.sh              # Provision parties + upload DAR + write .env.canton
-│   ├── README.md                    # Canton-specific setup and LocalNet guide
-│   └── daml/SettlementGuard/
-│       └── CommitmentRegistry.daml  # SettlementCommitment + AnchoredCommitment templates
-├── frontend/
-│   ├── app/
-│   │   ├── page.tsx                 # Landing page
-│   │   ├── app/page.tsx             # Compliance console
-│   │   └── api/v1/[...path]/        # Server-side API proxy
-│   └── lib/
-│       └── api.ts                   # API client
-├── examples/
-│   ├── isda-margin.json             # ISDA margin check example payload
-│   ├── isla-collateral.json         # ISLA collateral coverage example payload
-│   └── icma-repo.json               # ICMA repo check example payload
-├── .env.example                     # Environment variable template
-└── README.md
+```text
+backend/src/
+├── server.ts
+├── cdm/                                      # existing provider boundary
+├── contributions/finosCdm/collateralEligibility/
+│   ├── adapter.ts
+│   ├── assessment.ts
+│   ├── evaluator.ts
+│   ├── evidence.ts
+│   ├── proof-artifact.ts
+│   ├── registration.ts
+│   ├── types.ts
+│   └── verification.ts
+├── engine/ossRuleEvaluator.ts
+├── rules/isda/margin.ts
+├── rules/isla/collateral.ts
+├── rules/icma/repo.ts
+├── proof-chain.ts
+├── attestation.ts
+├── crypto.ts
+├── canton-ledger.ts
+└── middleware/auth.ts
+canton/
+├── daml/SettlementGuard/CommitmentRegistry.daml
+├── daml.yaml
+└── setup-canton.sh
+docs/
+├── DEVNET.md
+├── RENAME.md
+└── openapi.yaml
 ```
 
----
+The tree shows the new isolated namespace, existing CDM boundary, and legacy rules without implying that they are one executable pipeline.
 
-## Component Architecture
+## CompliOpen and CompliLedger
 
-```mermaid
-graph LR
-    subgraph FE_P["📄 Frontend — Pages"]
-        LP["Landing Page\napp/page.tsx"]
-        CC["Compliance Console\napp/app/page.tsx"]
-    end
+CompliOpen is an open-source contribution implementation demonstrating selected deterministic governance, evidence, assessment, and proof patterns. It is **not** the open-source edition of the full CompliLedger commercial platform. No proprietary internals or commercial regulatory content are included.
 
-    subgraph FE_L["📦 Frontend — Libraries"]
-        APIC["API Client\nlib/api.ts"]
-        PRXY["API Proxy\napi/v1/proxy"]
-    end
+## FINOS/CDM Contribution
 
-    subgraph SRV_C["🔧 Backend — Core"]
-        SRV["server.ts\nExpress REST API"]
-        PC["proof-chain.ts\n4-step evaluator"]
-        ATT["attestation.ts\nEd25519 issuer"]
-        BND["bundle.ts\nMerkle sealer"]
-        CR["crypto.ts\nSHA-256 + Ed25519"]
-    end
+The current direction is evidence-backed collateral eligibility using FINOS CDM, under development and being explored rather than accepted, endorsed, or approved. The related upstream discussion is [FINOS Common Domain Model issue #4684](https://github.com/finos/common-domain-model/issues/4684). This repository does not rewrite that issue's history or claim an upstream decision.
 
-    subgraph SRV_A["🔌 Backend — Adapters"]
-        CLA["canton-ledger.ts\nJSON API v2"]
-        DA["dynamo-anchor.ts\nDynamoDB / SQLite"]
-        BRA["bedrock-reasoning.ts\nAWS Nova Micro"]
-    end
-
-    subgraph SRV_R["📏 Backend — Rule Engine"]
-        OSS["ossRuleEvaluator.ts"]
-        REG["ruleRegistry.ts"]
-        IM["isda/margin.ts"]
-        IC["isla/collateral.ts"]
-        IR["icma/repo.ts"]
-    end
-
-    subgraph DAML["🔷 Canton — Daml Contracts"]
-        SC["SettlementCommitment\nCommitmentRegistry.daml"]
-        AC["AnchoredCommitment\nCommitmentRegistry.daml"]
-    end
-
-    LP & CC --> APIC --> PRXY --> SRV
-    SRV --> PC & ATT & BND
-    PC & ATT & BND --> CR
-    SRV --> CLA & DA & BRA
-    SRV --> OSS --> REG --> IM & IC & IR
-    CLA -->|submit-and-wait| SC
-    SC -->|AnchorCommitment| AC
-```
-
----
-
-## Optional AI-Assisted Reasoning
-
-CompliOpen can optionally generate AI-assisted explanations via `POST /v1/reasoning/:id` (AWS Bedrock, Amazon Nova Micro). This capability exists purely to translate deterministic evaluation results into plain-language commentary for human reviewers.
-
-- **Informational only** — AI output is commentary, never a decision
-- **Non-deterministic** — model output may vary across invocations
-- **Not part of proof generation** — AI text is excluded from the proof bundle, the bundle root hash, and the Ed25519 attestation
-- It does not affect evaluation results, attestation values, or on-chain commitments
-- Requires valid AWS credentials and Bedrock model access
-
-> The deterministic proof chain is the source of truth. AI-assisted reasoning is a presentation aid layered on top of it.
-
----
-
-## FINOS / CDM Contribution
-
-> CompliOpen is currently being explored as a **proposed deterministic validation and attestation pattern** aligned to CDM lifecycle events within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
-
-Discussion and design proposal:
-🔗 [finos/common-domain-model#4684](https://github.com/finos/common-domain-model/issues/4684)
-
-The intent is to contribute CompliOpen's evaluation and attestation pattern as a reusable, standards-aligned building block that complements CDM's lifecycle and workflow representations — enabling the broader ecosystem to share a consistent approach to deterministic validation and verifiable evidence for tokenized financial infrastructure.
-
----
+The contribution is intentionally conservative: it provides an adapter boundary, explicit unresolved source/mapping/evidence states, versioned rule metadata, guarded registration, deterministic evaluation plumbing, assessment states, and an unsigned proof/replay API. It does not install a rule or claim that its mappings are validated FINOS schema mappings.
 
 ## Contributing
 
-All FINOS Hackathon projects are [Apache 2.0 licensed](LICENSE) and accept contributions via GitHub pull requests.
+Contributions should keep authoritative-source questions, evidence provenance, and implementation status explicit. In particular:
 
-Each commit must include a DCO sign-off:
+1. Do not invent eligibility criteria or populate unresolved authority metadata.
+2. Keep new contribution code separate from legacy reference rules and provider integrations.
+3. Preserve deterministic behavior, exact versions, reason codes, and replay inputs.
+4. Do not add AI judgment to the eligibility path.
+5. Add tests for changes and run the relevant existing scripts.
+6. Do not commit secrets or deployment credentials.
+7. Follow the repository's DCO and licensing requirements.
 
-```
-Signed-off-by: Your Name <you@compliledger.com>
-```
-
-```bash
-git config user.name "Your Name"
-git config user.email "you@compliledger.com"
-git commit -s -m "your commit message"
-```
-
----
+Historical compatibility names and migration context are documented in [`docs/RENAME.md`](docs/RENAME.md); do not rename those identifiers as part of a contribution.
 
 ## Disclaimer
 
-This repository is a **reference implementation** intended for demonstration and development purposes.
-
-- Security controls are simplified
-- Key management is not production-grade
-- Execution systems are not included
-- Rule packs are illustrative reference snippets, not legal compliance engines
-
-Production deployments should include:
-
-- Secure key management (KMS / HSM)
-- Authentication and authorization controls
-- Transactional persistence and audit logging
-- Infrastructure hardening and network isolation
-- Legal review of rule pack alignment with applicable regulations
-
----
+CompliOpen output is informational and technical. It is not legal advice, a regulatory determination, a transaction authorization, an execution instruction, or a substitute for professional review. A deterministic result, signature, hash, proof artifact, or provider response does not establish source authority, authenticity, freshness, compliance, or eligibility by itself.
 
 ## License
 
-[Apache 2.0](LICENSE)
+This project is licensed under the [Apache License 2.0](LICENSE). See [`NOTICE`](NOTICE) and repository files for attribution and DCO information.
 
----
+## Project Origin / Team
 
-## Team
+### Project Origin — SettlementGuard
 
-**CompliLedger** — Innovate.DTCC Hackathon 2026
-Presented in the **Regulatory Compliance & Governance** track
-Slot: 11:25–11:40am ET
+CompliOpen originated as SettlementGuard, CompliLedger's Innovate.DTCC 2026 hackathon project. The original project explored deterministic financial rules, canonical bundles, SHA-256, Ed25519 signatures, independent verification, optional Canton/Daml commitments, and reference ISDA/ISLA/ICMA rules. Those capabilities and artifacts remain available while the repository evolves toward the FINOS/CDM contribution described above.
+
+The historical SettlementGuard team, FINOS/DTCC attribution, original schedules, and original artifacts are retained as historical record. They should not be read as a current delivery schedule or as evidence that an authoritative collateral requirement has been selected. See [`docs/RENAME.md`](docs/RENAME.md) and the retained source and archive paths for compatibility details.
+
+### Open questions requiring human review
+
+- Selection and validation of the authoritative collateral-eligibility source and provision.
+- External CDM mappings and evidence authenticity/freshness requirements.
+- Upstream FINOS acceptance or endorsement of the contribution direction.
+- Live DevNet, validator, deployment, and operational status.
+- Historical context not independently verified in this repository.
