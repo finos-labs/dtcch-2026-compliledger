@@ -26,6 +26,11 @@ CompliOpen is CompliLedger's open-source implementation and contribution surface
 See [the rename and compatibility note](docs/RENAME.md) for the retained
 historical, signed-evidence, ledger, authentication, and external identifiers.
 
+The [new FINOS CDM collateral-eligibility contribution scaffold](docs/finos-cdm-collateral-eligibility.md)
+is separate from both the existing/reference ISDA/ISLA/ICMA rules and the
+pre-existing CDM provider integration. It does not make production eligibility
+determinations.
+
 ---
 
 ## What CompliOpen Is — and Is Not
