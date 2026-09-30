@@ -4,6 +4,8 @@ export { validateEvidence } from "./evidence";
 export { evaluateCollateralEligibility } from "./evaluator";
 export { assessCollateralEligibility } from "./assessment";
 export { CollateralEligibilityRuleCatalog } from "./registration";
+export { createCollateralEligibilityProof } from "./proof-artifact";
+export { verifyCollateralEligibilityProof } from "./verification";
 export type {
   AdapterEnvelope, OptionalMapping, CollateralFact, SourceFact, DerivedFact,
   UnavailableFact, EvidenceInput, Evidence, EvidenceValidation,
@@ -12,7 +14,8 @@ export type {
   CollateralEligibilityRuleMetadata, RuleSourceReviewAdmission,
   CollateralEligibilityRule, CollateralEligibilityRuleDefinition,
   RegisteredCollateralEligibilityRule, EvaluationContext, EvaluationResult,
-  RuleEvaluationOutput, Assessment,
+  RuleEvaluationOutput, Assessment, CollateralSubject, CollateralOperationalState,
+  CapturedReplayInput, AssessmentReplay, ProofArtifactPayload, ProofArtifact, ProofVerification,
 } from "./types";
 export type {
   RegistrationDiagnostic, RegistrationDiagnosticCode, RuleRegistrationResult,

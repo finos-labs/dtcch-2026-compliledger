@@ -19,7 +19,7 @@ export function assessCollateralEligibility(
   return {
     contributionId: adapted.contributionId,
     input: { sourceObject: adapted.sourceObject, sourceReference: adapted.sourceReference },
-    mappings: adapted.mappings, facts: adapted.facts,
+    mappings: adapted.mappings, facts: adapted.facts, adapterDiagnostics: adapted.diagnostics,
     evidence: validated.evidence, sourceValidation: adapted.sourceValidation,
     context: snapshot(context) as EvaluationContext, evaluation,
   };
