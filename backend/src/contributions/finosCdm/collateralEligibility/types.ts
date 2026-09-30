@@ -8,10 +8,13 @@ export type ReasonCode =
   | "MAPPING_INVALID"
   | "EVIDENCE_MISSING"
   | "EVIDENCE_INVALID"
-  | "EVIDENCE_UNVALIDATED";
+  | "EVIDENCE_UNVALIDATED"
+  | "RULE_APPLICABILITY_UNRESOLVED"
+  | "RULE_NOT_APPLICABLE"
+  | "RULE_EXECUTION_INVALID";
 
 export interface Reason {
-  code: ReasonCode;
+  code: string;
   message: string;
   factRef?: string;
   evidenceId?: string;
@@ -115,21 +118,109 @@ export interface EvaluationResult {
   reasons: Reason[];
   evidenceDiagnostics: Reason[];
   sourceValidation: SourceValidation;
+  ruleMetadata?: CollateralEligibilityRuleMetadata;
+  sourceReview?: RuleSourceReviewAdmission;
 }
 
-// A future implementation must be installed only after reviewed source/provision
-// lineage is established. The private brand prevents legacy Rule/provider objects
-// from satisfying this interface by structural coincidence.
-declare const reviewedRuleBoundary: unique symbol;
+export type ReviewableValue<T> =
+  | { status: "UNRESOLVED"; value: null }
+  | { status: "REVIEWED"; value: T };
+
+export type ApplicabilityValue<T> =
+  | ReviewableValue<T>
+  | { status: "NOT_APPLICABLE"; value: null };
+
+export type ReviewedDeclaration<T> =
+  | { status: "UNRESOLVED"; value: null }
+  | { status: "REVIEWED"; value: T };
+
+export interface RuleSourceDocument {
+  title: string;
+  reference: string;
+  version: string;
+}
+
+export interface RuleReasonCodeDeclaration {
+  code: string;
+  description: string;
+}
+
+export interface RuleProvenance {
+  sourceReference: string;
+  documentVersion: string;
+  provisionReference: string;
+  notes: string[];
+}
+
+export interface CollateralEligibilityRuleMetadata {
+  contributionId: typeof CONTRIBUTION_ID;
+  ruleId: string | null;
+  ruleVersion: string | null;
+  sourceAuthority: ReviewableValue<string>;
+  sourceDocument: ReviewableValue<RuleSourceDocument>;
+  sourceProvision: ReviewableValue<string>;
+  effectiveDate: ApplicabilityValue<string>;
+  jurisdiction: ApplicabilityValue<string[]>;
+  scope: ApplicabilityValue<string[]>;
+  applicabilityConditions: ReviewedDeclaration<string[]>;
+  requiredInputs: ReviewedDeclaration<string[]>;
+  requiredEvidence: ReviewedDeclaration<string[]>;
+  reasonCodes: ReviewedDeclaration<RuleReasonCodeDeclaration[]>;
+  provenance: ReviewedDeclaration<RuleProvenance>;
+}
+
+export interface RuleSourceReviewAdmission {
+  recordType: "APPLICATION_CONTROLLED_SOURCE_REVIEW";
+  disposition: "APPROVED_FOR_REGISTRATION";
+  reviewerId: string;
+  reviewReference: string;
+  reviewedAt: string;
+  reviewedMetadata: CollateralEligibilityRuleMetadata;
+}
+
+export type ApplicabilityOutcome = "APPLICABLE" | "NOT_APPLICABLE" | "UNKNOWN";
+
+export interface RuleEvaluationOutput {
+  decision: Exclude<Decision, "RULE_NOT_CONFIGURED">;
+  rule: { id: string; version: string };
+  reasons: Reason[];
+}
+
+// Executable candidates must be admitted to a runtime registry before the
+// pipeline will invoke either callback.
 export interface CollateralEligibilityRule {
-  readonly [reviewedRuleBoundary]: true;
   readonly id: string;
   readonly version: string;
+  checkApplicability(
+    collateralFacts: readonly CollateralFact[],
+    evidence: readonly Evidence[],
+    evaluationContext: EvaluationContext
+  ): ApplicabilityOutcome;
   evaluate(
     collateralFacts: readonly CollateralFact[],
     evidence: readonly Evidence[],
     evaluationContext: EvaluationContext
-  ): EvaluationResult;
+  ): RuleEvaluationOutput;
+}
+
+export type RuleLifecycle = "DRAFT" | "TEMPLATE" | "REVIEW_COMPLETE";
+
+export type CollateralEligibilityRuleDefinition =
+  | {
+      lifecycle: "DRAFT" | "TEMPLATE";
+      metadata: CollateralEligibilityRuleMetadata;
+      checkApplicability?: null;
+      evaluate?: null;
+    }
+  | {
+      lifecycle: "REVIEW_COMPLETE";
+      metadata: CollateralEligibilityRuleMetadata;
+      checkApplicability: CollateralEligibilityRule["checkApplicability"];
+      evaluate: CollateralEligibilityRule["evaluate"];
+    };
+
+export interface RegisteredCollateralEligibilityRule {
+  readonly kind: "REGISTERED_COLLATERAL_ELIGIBILITY_RULE";
 }
 
 export interface Assessment {

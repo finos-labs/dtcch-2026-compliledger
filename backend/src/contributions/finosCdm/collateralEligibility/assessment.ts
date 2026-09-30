@@ -6,7 +6,8 @@ import type { Assessment, EvaluationContext } from "./types";
 export function assessCollateralEligibility(
   input: unknown,
   evidenceInput: unknown,
-  context: EvaluationContext
+  context: EvaluationContext,
+  ruleHandle?: unknown
 ): Assessment {
   if (!context || typeof context.evaluatedAt !== "string" ||
     Number.isNaN(Date.parse(context.evaluatedAt))) {
@@ -14,7 +15,7 @@ export function assessCollateralEligibility(
   }
   const adapted = adaptCollateralInput(input);
   const validated = validateEvidence(evidenceInput);
-  const evaluation = evaluateCollateralEligibility(adapted, validated, context);
+  const evaluation = evaluateCollateralEligibility(adapted, validated, context, ruleHandle);
   return {
     contributionId: adapted.contributionId,
     input: { sourceObject: adapted.sourceObject, sourceReference: adapted.sourceReference },

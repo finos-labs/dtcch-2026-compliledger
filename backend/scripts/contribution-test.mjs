@@ -116,6 +116,368 @@ const derived = {
 };
 assert.equal(derived.kind, "DERIVED");
 assert.deepEqual(derived.inputFactRefs, ["internal.token"]);
+
+const reviewed = (value) => ({ status: "REVIEWED", value });
+const unresolved = { status: "UNRESOLVED", value: null };
+const notApplicable = { status: "NOT_APPLICABLE", value: null };
+function syntheticMetadata(ruleId = "synthetic-test-rule", ruleVersion = "test-v1") {
+  return {
+    contributionId: "finos-cdm-collateral-eligibility",
+    ruleId,
+    ruleVersion,
+    sourceAuthority: reviewed("Synthetic test authority (not authoritative)"),
+    sourceDocument: reviewed({
+      title: "Synthetic test document (not authoritative)",
+      reference: "urn:synthetic-test-only:document",
+      version: "synthetic-document-v1",
+    }),
+    sourceProvision: reviewed("Synthetic test provision (not a real clause)"),
+    effectiveDate: notApplicable,
+    jurisdiction: reviewed(["TEST ONLY"]),
+    scope: notApplicable,
+    applicabilityConditions: reviewed([]),
+    requiredInputs: reviewed([]),
+    requiredEvidence: reviewed([]),
+    reasonCodes: reviewed([{
+      code: "SYNTHETIC_TEST_RESULT",
+      description: "Test-only reason declaration; not an eligibility criterion",
+    }]),
+    provenance: reviewed({
+      sourceReference: "urn:synthetic-test-only:document",
+      documentVersion: "synthetic-document-v1",
+      provisionReference: "Synthetic test provision (not a real clause)",
+      notes: ["Synthetic fixture only; no source authority is asserted"],
+    }),
+  };
+}
+function syntheticAdmission(metadata) {
+  return {
+    recordType: "APPLICATION_CONTROLLED_SOURCE_REVIEW",
+    disposition: "APPROVED_FOR_REGISTRATION",
+    reviewerId: "test-only-synthetic-reviewer",
+    reviewReference: "test-only-synthetic-review-record",
+    reviewedAt: "2026-09-30T12:00:00.000Z",
+    reviewedMetadata: structuredClone(metadata),
+  };
+}
+function syntheticDefinition(metadata, evaluateFunction, applicabilityFunction = () => "APPLICABLE") {
+  return {
+    lifecycle: "REVIEW_COMPLETE",
+    metadata,
+    checkApplicability: applicabilityFunction,
+    evaluate: evaluateFunction,
+  };
+}
+function outputFor(metadata, decision = "SATISFIED", reasons = []) {
+  return { decision, rule: { id: metadata.ruleId, version: metadata.ruleVersion }, reasons };
+}
+function assertNonDetermination(assessment) {
+  assert.ok(["RULE_NOT_CONFIGURED", "MANUAL_REVIEW_REQUIRED"].includes(assessment.evaluation.decision));
+  assert.notEqual(assessment.evaluation.decision, "SATISFIED");
+  assert.notEqual(assessment.evaluation.decision, "NOT_SATISFIED");
+}
+
+const ruleRegistryForContribution = new contribution.CollateralEligibilityRuleCatalog();
+let rejectedCallbackCalls = 0;
+let invalidCandidateIndex = 0;
+const rejectedMetadataCases = [
+  ["missing rule id", (metadata) => { delete metadata.ruleId; }],
+  ["null rule id", (metadata) => { metadata.ruleId = null; }],
+  ["blank rule id", (metadata) => { metadata.ruleId = "   "; }],
+  ["missing version", (metadata) => { delete metadata.ruleVersion; }],
+  ["null version", (metadata) => { metadata.ruleVersion = null; }],
+  ["blank version", (metadata) => { metadata.ruleVersion = ""; }],
+  ["missing authority", (metadata) => { delete metadata.sourceAuthority; }],
+  ["unresolved authority", (metadata) => { metadata.sourceAuthority = unresolved; }],
+  ["null authority", (metadata) => { metadata.sourceAuthority = reviewed(null); }],
+  ["blank authority", (metadata) => { metadata.sourceAuthority = reviewed(" "); }],
+  ["TODO authority", (metadata) => { metadata.sourceAuthority = reviewed("TODO: source"); }],
+  ["missing source document", (metadata) => { delete metadata.sourceDocument; }],
+  ["unresolved source document", (metadata) => { metadata.sourceDocument = unresolved; }],
+  ["null document title", (metadata) => { metadata.sourceDocument.value.title = null; }],
+  ["blank document reference", (metadata) => { metadata.sourceDocument.value.reference = ""; }],
+  ["blank document version", (metadata) => { metadata.sourceDocument.value.version = " "; }],
+  ["missing provision", (metadata) => { delete metadata.sourceProvision; }],
+  ["unresolved provision", (metadata) => { metadata.sourceProvision = unresolved; }],
+  ["null provision", (metadata) => { metadata.sourceProvision = reviewed(null); }],
+  ["blank provision", (metadata) => { metadata.sourceProvision = reviewed(" "); }],
+  ["unresolved effective date", (metadata) => { metadata.effectiveDate = unresolved; }],
+  ["malformed effective date", (metadata) => { metadata.effectiveDate = reviewed("2026-02-30"); }],
+  ["wrong effective date type", (metadata) => { metadata.effectiveDate = reviewed(20260930); }],
+  ["missing jurisdiction", (metadata) => { delete metadata.jurisdiction; }],
+  ["unresolved jurisdiction", (metadata) => { metadata.jurisdiction = unresolved; }],
+  ["malformed jurisdiction", (metadata) => { metadata.jurisdiction = reviewed("TEST"); }],
+  ["missing scope", (metadata) => { delete metadata.scope; }],
+  ["unresolved scope", (metadata) => { metadata.scope = unresolved; }],
+  ["unresolved applicability", (metadata) => { metadata.applicabilityConditions = unresolved; }],
+  ["missing applicability", (metadata) => { delete metadata.applicabilityConditions; }],
+  ["null inputs declaration", (metadata) => { metadata.requiredInputs = reviewed(null); }],
+  ["blank required input", (metadata) => { metadata.requiredInputs = reviewed([" "]); }],
+  ["unresolved inputs", (metadata) => { metadata.requiredInputs = unresolved; }],
+  ["null evidence declaration", (metadata) => { metadata.requiredEvidence = reviewed(null); }],
+  ["blank evidence declaration", (metadata) => { metadata.requiredEvidence = reviewed([" "]); }],
+  ["unresolved evidence", (metadata) => { metadata.requiredEvidence = unresolved; }],
+  ["null reason declaration", (metadata) => { metadata.reasonCodes = reviewed(null); }],
+  ["unresolved reasons", (metadata) => { metadata.reasonCodes = unresolved; }],
+  ["duplicate reason declarations", (metadata) => {
+    metadata.reasonCodes.value.push({ ...metadata.reasonCodes.value[0] });
+  }],
+  ["malformed reason declaration", (metadata) => {
+    metadata.reasonCodes.value[0].code = "lower-case";
+  }],
+  ["unresolved provenance", (metadata) => { metadata.provenance = unresolved; }],
+  ["missing provenance", (metadata) => { delete metadata.provenance; }],
+  ["TODO provenance note", (metadata) => { metadata.provenance.value.notes = ["TODO: confirm"]; }],
+  ["mismatched provenance", (metadata) => {
+    metadata.provenance.value.provisionReference = "different synthetic provision";
+  }],
+  ["extra metadata flag", (metadata) => { metadata.sourceValidation = "VALIDATED"; }],
+];
+for (const [label, alter] of rejectedMetadataCases) {
+  const metadata = syntheticMetadata(`synthetic-invalid-${invalidCandidateIndex++}`);
+  alter(metadata);
+  const candidate = syntheticDefinition(metadata, () => {
+    rejectedCallbackCalls += 1;
+    return outputFor(metadata);
+  }, () => {
+    rejectedCallbackCalls += 1;
+    return "APPLICABLE";
+  });
+  const registration = ruleRegistryForContribution.register(candidate, syntheticAdmission(metadata));
+  assert.equal(registration.ok, false, `${label} must reject registration`);
+  assert.ok(registration.diagnostics.length > 0, `${label} has stable diagnostics`);
+  assert.deepEqual(
+    ruleRegistryForContribution.register(candidate, syntheticAdmission(metadata)).diagnostics,
+    registration.diagnostics,
+    `${label} diagnostics are stable`
+  );
+  assertNonDetermination(contribution.assessCollateralEligibility(synthetic, evidence, context, registration.handle));
+  const directEvaluation = contribution.evaluateCollateralEligibility(
+    contribution.adaptCollateralInput(synthetic),
+    contribution.validateEvidence(evidence),
+    context,
+    registration.handle
+  );
+  assert.equal(directEvaluation.decision, "RULE_NOT_CONFIGURED");
+  assert.equal(rejectedCallbackCalls, 0, `${label} callback must not run`);
+}
+
+for (const lifecycle of ["DRAFT", "TEMPLATE"]) {
+  const metadata = syntheticMetadata(`synthetic-${lifecycle.toLowerCase()}`);
+  const candidate = syntheticDefinition(metadata, () => {
+    rejectedCallbackCalls += 1;
+    return outputFor(metadata, "NOT_SATISFIED");
+  });
+  candidate.lifecycle = lifecycle;
+  const registration = ruleRegistryForContribution.register(candidate, syntheticAdmission(metadata));
+  assert.equal(registration.ok, false, `${lifecycle} with callbacks is non-executable`);
+  assert.ok(registration.diagnostics.some((item) => item.code === "RULE_NOT_REVIEW_COMPLETE"));
+  assertNonDetermination(contribution.assessCollateralEligibility(synthetic, evidence, context, registration.handle));
+  assert.equal(rejectedCallbackCalls, 0);
+}
+
+const unresolvedTemplateMetadata = syntheticMetadata("synthetic-template");
+unresolvedTemplateMetadata.ruleId = null;
+unresolvedTemplateMetadata.ruleVersion = null;
+unresolvedTemplateMetadata.sourceAuthority = unresolved;
+unresolvedTemplateMetadata.sourceDocument = unresolved;
+unresolvedTemplateMetadata.sourceProvision = unresolved;
+unresolvedTemplateMetadata.effectiveDate = unresolved;
+unresolvedTemplateMetadata.jurisdiction = unresolved;
+unresolvedTemplateMetadata.scope = unresolved;
+unresolvedTemplateMetadata.applicabilityConditions = unresolved;
+unresolvedTemplateMetadata.requiredInputs = unresolved;
+unresolvedTemplateMetadata.requiredEvidence = unresolved;
+unresolvedTemplateMetadata.reasonCodes = unresolved;
+unresolvedTemplateMetadata.provenance = unresolved;
+const explicitTemplate = ruleRegistryForContribution.register({
+  lifecycle: "TEMPLATE",
+  metadata: unresolvedTemplateMetadata,
+  checkApplicability: null,
+  evaluate: null,
+}, syntheticAdmission(unresolvedTemplateMetadata));
+assert.equal(explicitTemplate.ok, false, "An explicitly unresolved, non-executable template cannot register");
+assertNonDetermination(contribution.assessCollateralEligibility(
+  synthetic, evidence, context, explicitTemplate.handle
+));
+
+const incompleteMetadata = syntheticMetadata("synthetic-no-admission");
+const completeWithoutAdmission = ruleRegistryForContribution.register(
+  syntheticDefinition(incompleteMetadata, () => outputFor(incompleteMetadata)),
+  { sourceValidation: "VALIDATED" }
+);
+assert.equal(completeWithoutAdmission.ok, false, "A self-asserted validation flag is not admission evidence");
+assert.ok(completeWithoutAdmission.diagnostics.some((item) => item.code === "RULE_ADMISSION_INVALID"));
+const noAdmissionEvaluation = contribution.evaluateCollateralEligibility(
+  contribution.adaptCollateralInput(synthetic),
+  contribution.validateEvidence(evidence),
+  context,
+  completeWithoutAdmission.handle
+);
+assert.equal(noAdmissionEvaluation.decision, "RULE_NOT_CONFIGURED");
+
+const alteredAdmissionMetadata = syntheticMetadata("synthetic-admission-binding");
+const alteredAdmission = syntheticAdmission(alteredAdmissionMetadata);
+alteredAdmission.reviewedMetadata.sourceProvision = reviewed("A different synthetic provision");
+assert.equal(ruleRegistryForContribution.register(
+  syntheticDefinition(alteredAdmissionMetadata, () => outputFor(alteredAdmissionMetadata)),
+  alteredAdmission
+).ok, false, "Admission evidence must bind to the exact metadata");
+let badAdmissionIndex = 0;
+for (const [name, alterAdmission] of [
+  ["missing reviewer", (admission) => { delete admission.reviewerId; }],
+  ["blank reviewer", (admission) => { admission.reviewerId = " "; }],
+  ["TODO review reference", (admission) => { admission.reviewReference = "TODO"; }],
+  ["malformed review timestamp", (admission) => { admission.reviewedAt = "2026-02-30T12:00:00Z"; }],
+  ["extra validation flag", (admission) => { admission.sourceValidation = "VALIDATED"; }],
+]) {
+  const metadata = syntheticMetadata(`synthetic-bad-admission-${badAdmissionIndex++}`);
+  const admission = syntheticAdmission(metadata);
+  alterAdmission(admission);
+  const result = ruleRegistryForContribution.register(
+    syntheticDefinition(metadata, () => outputFor(metadata)),
+    admission
+  );
+  assert.equal(result.ok, false, `${name} is insufficient admission evidence`);
+  assert.ok(result.diagnostics.some((item) => item.code === "RULE_ADMISSION_INVALID"));
+}
+
+const missingEvaluatorMetadata = syntheticMetadata("synthetic-missing-evaluator");
+const missingEvaluator = syntheticDefinition(missingEvaluatorMetadata, null);
+assert.equal(ruleRegistryForContribution.register(
+  missingEvaluator, syntheticAdmission(missingEvaluatorMetadata)
+).ok, false);
+const missingApplicabilityMetadata = syntheticMetadata("synthetic-missing-applicability");
+const missingApplicability = syntheticDefinition(missingApplicabilityMetadata, () => outputFor(missingApplicabilityMetadata));
+missingApplicability.checkApplicability = null;
+assert.equal(ruleRegistryForContribution.register(
+  missingApplicability, syntheticAdmission(missingApplicabilityMetadata)
+).ok, false);
+
+const metadataV1 = syntheticMetadata("synthetic-versioned-rule", "test-v1");
+const metadataV1Identity = { ruleId: metadataV1.ruleId, ruleVersion: metadataV1.ruleVersion };
+let versionOneCalls = 0;
+const definitionV1 = syntheticDefinition(metadataV1, () => {
+  versionOneCalls += 1;
+  return outputFor(metadataV1Identity, "SATISFIED", [{
+    code: "SYNTHETIC_TEST_RESULT", message: "Synthetic version one only",
+  }]);
+});
+const registrationV1 = ruleRegistryForContribution.register(definitionV1, syntheticAdmission(metadataV1));
+assert.equal(registrationV1.ok, true);
+const metadataV2 = syntheticMetadata("synthetic-versioned-rule", "test-v2");
+const definitionV2 = syntheticDefinition(metadataV2, () => outputFor(metadataV2, "NOT_SATISFIED", [{
+  code: "SYNTHETIC_TEST_RESULT", message: "Synthetic version two only",
+}]));
+const registrationV2 = ruleRegistryForContribution.register(definitionV2, syntheticAdmission(metadataV2));
+assert.equal(registrationV2.ok, true, "Explicit side-by-side versions are supported");
+const reviewedEmptyReasonsMetadata = syntheticMetadata("synthetic-reviewed-empty-reasons");
+reviewedEmptyReasonsMetadata.reasonCodes = reviewed([]);
+const reviewedEmptyReasons = ruleRegistryForContribution.register(
+  syntheticDefinition(reviewedEmptyReasonsMetadata, () => outputFor(reviewedEmptyReasonsMetadata)),
+  syntheticAdmission(reviewedEmptyReasonsMetadata)
+);
+assert.equal(reviewedEmptyReasons.ok, true, "A reviewed empty reason declaration is explicit and complete");
+assert.equal(ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v3"), null);
+assert.equal(ruleRegistryForContribution.select("toString", "test-v1"), null);
+
+const assessmentV1 = contribution.assessCollateralEligibility(
+  synthetic, evidence, context, ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v1")
+);
+const assessmentV2 = contribution.assessCollateralEligibility(
+  synthetic, evidence, context, ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v2")
+);
+assert.equal(assessmentV1.evaluation.decision, "SATISFIED");
+assert.equal(assessmentV1.evaluation.rule.version, "test-v1");
+assert.equal(assessmentV1.evaluation.ruleMetadata.sourceDocument.value.version, "synthetic-document-v1");
+assert.equal(assessmentV1.evaluation.sourceReview.reviewReference, "test-only-synthetic-review-record");
+assert.equal(assessmentV1.evaluation.sourceValidation, "PENDING_SOURCE_VALIDATION");
+assert.equal(assessmentV2.evaluation.decision, "NOT_SATISFIED");
+assert.equal(assessmentV2.evaluation.rule.version, "test-v2");
+assert.equal(assessmentV2.evaluation.ruleMetadata.ruleId, "synthetic-versioned-rule");
+assert.deepEqual(JSON.parse(JSON.stringify(assessmentV1)), assessmentV1);
+assert.deepEqual(assessmentV1, contribution.assessCollateralEligibility(
+  synthetic, evidence, context, ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v1")
+));
+assert.equal(Object.isFrozen(assessmentV1.evaluation.ruleMetadata), true);
+assert.equal(Object.isFrozen(assessmentV1.evaluation.ruleMetadata.requiredInputs.value), true);
+
+const registeredV1Handle = registrationV1.handle;
+metadataV1.sourceDocument.value.title = "Mutated after registration";
+metadataV1.ruleVersion = "mutated-version";
+definitionV1.evaluate = () => outputFor(metadataV1, "NOT_SATISFIED");
+assert.equal(ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v1"), registeredV1Handle);
+const afterMutation = contribution.assessCollateralEligibility(synthetic, evidence, context, registeredV1Handle);
+assert.equal(afterMutation.evaluation.rule.version, "test-v1");
+assert.equal(afterMutation.evaluation.ruleMetadata.sourceDocument.value.title, "Synthetic test document (not authoritative)");
+assert.equal(afterMutation.evaluation.decision, "SATISFIED");
+assert.equal(versionOneCalls, 3, "The captured evaluator identity is retained");
+
+const duplicateMetadata = syntheticMetadata("synthetic-versioned-rule", "test-v1");
+const duplicateResult = ruleRegistryForContribution.register(
+  syntheticDefinition(duplicateMetadata, () => outputFor(duplicateMetadata, "NOT_SATISFIED")),
+  syntheticAdmission(duplicateMetadata)
+);
+assert.equal(duplicateResult.ok, false, "A duplicate ID/version cannot overwrite a valid registration");
+assert.ok(duplicateResult.diagnostics.some((item) => item.code === "RULE_VERSION_ALREADY_REGISTERED"));
+assert.equal(contribution.assessCollateralEligibility(synthetic, evidence, context, registeredV1Handle)
+  .evaluation.decision, "SATISFIED");
+
+for (const [name, applicability] of [
+  ["indeterminate", () => "UNKNOWN"],
+  ["outside", () => "NOT_APPLICABLE"],
+]) {
+  const metadata = syntheticMetadata(`synthetic-applicability-${name}`);
+  let evaluationCalls = 0;
+  const registration = ruleRegistryForContribution.register(
+    syntheticDefinition(metadata, () => {
+      evaluationCalls += 1;
+      return outputFor(metadata);
+    }, applicability),
+    syntheticAdmission(metadata)
+  );
+  assert.equal(registration.ok, true);
+  const assessment = contribution.assessCollateralEligibility(synthetic, evidence, context, registration.handle);
+  assertNonDetermination(assessment);
+  assert.equal(evaluationCalls, 0, `${name} applicability cannot reach the rule callback`);
+}
+
+const badOutputs = [
+  ["wrong identity", (metadata) => ({ ...outputFor(metadata), rule: { id: "other", version: metadata.ruleVersion } })],
+  ["undeclared reason", (metadata) => outputFor(metadata, "SATISFIED", [{ code: "INVENTED_CODE", message: "bad" }])],
+  ["unconfigured output", (metadata) => outputFor(metadata, "RULE_NOT_CONFIGURED")],
+  ["malformed output", () => ({ decision: "SATISFIED", isEligible: true })],
+  ["throwing evaluator", () => { throw new Error("synthetic failure"); }],
+];
+for (const [name, makeOutput] of badOutputs) {
+  const metadata = syntheticMetadata(`synthetic-bad-output-${name.replaceAll(" ", "-")}`);
+  const registration = ruleRegistryForContribution.register(
+    syntheticDefinition(metadata, () => makeOutput(metadata)),
+    syntheticAdmission(metadata)
+  );
+  assert.equal(registration.ok, true, `${name} is rejected at evaluation, not admission`);
+  const assessment = contribution.assessCollateralEligibility(synthetic, evidence, context, registration.handle);
+  assert.equal(assessment.evaluation.decision, "MANUAL_REVIEW_REQUIRED", name);
+  assert.ok(assessment.evaluation.reasons.some((reason) => reason.code === "RULE_EXECUTION_INVALID"));
+  assert.equal(assessment.evaluation.rule.version, "test-v1");
+}
+
+const forgedHandle = { kind: "REGISTERED_COLLATERAL_ELIGIBILITY_RULE" };
+assertNonDetermination(contribution.assessCollateralEligibility(synthetic, evidence, context, forgedHandle));
+assertNonDetermination(contribution.assessCollateralEligibility(synthetic, evidence, context, {
+  kind: "REGISTERED_COLLATERAL_ELIGIBILITY_RULE",
+  metadata: metadataV1,
+  evaluate: () => outputFor(metadataV1),
+}));
+const forgedEvaluation = contribution.evaluateCollateralEligibility(
+  contribution.adaptCollateralInput(synthetic),
+  contribution.validateEvidence(evidence),
+  context,
+  forgedHandle
+);
+assert.equal(forgedEvaluation.decision, "RULE_NOT_CONFIGURED");
+assert.equal(forgedEvaluation.rule, null);
+
 assert.equal(ruleRegistry.ISLA[0].evaluate({ collateral_type: "bond", allowed_types: ["bond"] }).status, "PASS");
 assert.equal(ruleRegistry.ISLA[0].evaluate({ collateral_type: "bond", allowed_types: [] }).reason_code, "INELIGIBLE_COLLATERAL");
 assert.equal(ruleRegistry.ISDA[0].evaluate({ counterparty_status: "bad" }).reason_code, "INVALID_COUNTERPARTY");
