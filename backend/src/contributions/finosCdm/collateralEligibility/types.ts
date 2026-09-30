@@ -228,8 +228,61 @@ export interface Assessment {
   input: { sourceObject: unknown; sourceReference: string | null };
   mappings: OptionalMapping[];
   facts: CollateralFact[];
+  adapterDiagnostics: Reason[];
   evidence: Evidence[];
   sourceValidation: SourceValidation;
   context: EvaluationContext;
   evaluation: EvaluationResult;
+}
+
+export interface CollateralSubject {
+  kind: { status: "UNRESOLVED"; value: null };
+  reference:
+    | { status: "SOURCE_REFERENCE_ONLY"; value: string }
+    | { status: "UNRESOLVED"; value: null };
+  identityAssertion: "NOT_ESTABLISHED";
+}
+
+export interface CollateralOperationalState {
+  factRefs: string[];
+  evidenceReferences: string[];
+  evidenceObservations: { evidenceId: string; observedAt: string | null }[];
+  evaluationTime: string;
+  sourceAsOf: null;
+  freshness: "UNKNOWN";
+  diagnostics: { normalization: Reason[]; evidence: Reason[] };
+}
+
+export type CapturedReplayInput =
+  | { status: "ABSENT" | "NULL" }
+  | { status: "VALUE"; value: unknown };
+
+export interface AssessmentReplay {
+  input: CapturedReplayInput;
+  evidence: CapturedReplayInput;
+  context: EvaluationContext;
+}
+
+export interface ProofArtifactPayload {
+  artifactType: "FINOS_CDM_COLLATERAL_ELIGIBILITY_ASSESSMENT";
+  schemaVersion: 1;
+  canonicalizationVersion: "COMPLIOPEN_JSON_KEY_SORT_V1";
+  pipelineVersion: "COMPLIOPEN_FINOS_CDM_COLLATERAL_ELIGIBILITY_PIPELINE_V1";
+  normalizationVersion: "COMPLIOPEN_FINOS_CDM_COLLATERAL_NORMALIZATION_V1";
+  subject: CollateralSubject;
+  operationalState: CollateralOperationalState;
+  replay: AssessmentReplay;
+  assessment: Assessment;
+}
+
+export interface ProofArtifact extends ProofArtifactPayload {
+  commitment: { algorithm: "SHA-256"; digest: string };
+}
+
+export interface ProofVerification {
+  integrity: "VERIFIED" | "FAILED" | "UNSUPPORTED";
+  replay: "VERIFIED" | "MISMATCH" | "UNAVAILABLE" | "NOT_ATTEMPTED";
+  reasons: { code: string; message: string }[];
+  recordedDecision: Decision | null;
+  determinationAuthority: "NOT_ESTABLISHED_BY_PROOF_VERIFICATION";
 }

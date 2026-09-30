@@ -20,6 +20,16 @@ Admission validation checks the shape and exact metadata binding of a recorded r
 
 The optional registered handle plugs into the existing adapter → facts → evidence → rule → evaluation → assessment path. Without a valid registered handle, both evaluation entry points retain `RULE_NOT_CONFIGURED` and `AUTHORITATIVE_RULE_NOT_CONFIGURED`. Unknown or outside applicability and invalid callback output fail closed to manual review; rule reason codes must have been declared in reviewed metadata. Successful rule execution does not change the pending validation state of CDM facts or evidence.
 
+## Local proof artifact and verification
+
+`createCollateralEligibilityProof` snapshots strict JSON inputs before using the existing assessment pipeline. The versioned unsigned artifact records a source-reference-only subject (identity remains unestablished), a view of normalized fact/evidence references and diagnostics, unknown source as-of/freshness, replay inputs, and the complete assessment including selected exact-version rule metadata and review lineage. Missing and null replay inputs are represented explicitly. Unsupported JSON values such as accessors, sparse arrays, cycles, functions, non-finite numbers, or non-plain objects are rejected rather than silently omitted.
+
+The SHA-256 commitment covers the canonical payload fields, including artifact type/schema, canonicalization, pipeline and normalization versions, subject, state, replay inputs, and assessment; it excludes only the commitment object itself. Canonicalization sorts object keys, preserves array order, and does not normalize Unicode. This local content commitment is unsigned: a hash can be recomputed after an edit and is not an authenticated origin or external trust anchor.
+
+`verifyCollateralEligibilityProof` treats its argument as untrusted data. It checks supported versions and integrity before replay, derives subject/state bindings from the recorded assessment, and uses only the caller-supplied in-memory registered handle whose exact rule ID, version, metadata, and review record match. It never loads code or fetches source/evidence references. A rule ID/version is not a cryptographic identity for callback code; trusted application registrations must keep each version's implementation immutable and deterministic. Arbitrary registered callbacks are trusted application code, not sandboxed or proven pure. A coherent edited artifact with a recomputed hash cannot be distinguished from an original without an independently trusted commitment.
+
+Integrity verification and deterministic replay establish only that the recorded JSON payload is internally consistent and reproducible under the available pipeline/registration. They do not validate fact or evidence authenticity, mapping correctness, legal authority, currentness, regulatory compliance, or eligibility. Source review records are application-controlled attestations, not authenticated normative truth. Successful artifact verification does not itself make or promote an eligibility determination.
+
 ## Unresolved source requirements
 
 - Identify and review the authoritative source authority, source document and document version, and exact source provision.

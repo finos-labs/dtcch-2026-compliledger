@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
 import ts from "typescript";
@@ -484,4 +485,201 @@ assert.equal(ruleRegistry.ISDA[0].evaluate({ counterparty_status: "bad" }).reaso
 assert.equal(ruleRegistry.ICMA[1].evaluate({ current_date: "2026-09-30", end_date: "2020-01-01" }).reason_code, "REPO_EXPIRED");
 assert.equal(evaluate("ISLA", { collateral_type: "bond", allowed_types: [] }).decision, "FAIL");
 assert.deepEqual(Object.keys(ruleRegistry).sort(), ["ICMA", "ISDA", "ISLA"]);
-console.log("Contribution boundary, provenance, determinism and reference regression tests passed");
+
+const registeredRule = ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v1");
+const proof = contribution.createCollateralEligibilityProof(synthetic, evidence, context, registeredRule);
+const repeatedProof = contribution.createCollateralEligibilityProof(synthetic, evidence, context, registeredRule);
+assert.deepEqual(proof, repeatedProof);
+assert.equal(proof.assessment.evaluation.decision, "SATISFIED");
+assert.equal(proof.assessment.evaluation.rule.version, "test-v1");
+assert.equal(proof.assessment.evaluation.sourceReview.reviewReference, "test-only-synthetic-review-record");
+assert.deepEqual(proof.subject, {
+  kind: { status: "UNRESOLVED", value: null },
+  reference: { status: "SOURCE_REFERENCE_ONLY", value: "synthetic-object-1" },
+  identityAssertion: "NOT_ESTABLISHED",
+});
+assert.equal(proof.operationalState.evaluationTime, context.evaluatedAt);
+assert.equal(proof.operationalState.sourceAsOf, null);
+assert.equal(proof.operationalState.freshness, "UNKNOWN");
+assert.deepEqual(proof.operationalState.factRefs, proof.assessment.facts.map((fact) => fact.factRef));
+assert.deepEqual(proof.operationalState.evidenceReferences, ["synthetic-1"]);
+assert.equal(Object.isFrozen(proof), true);
+assert.equal(Object.isFrozen(proof.assessment.evaluation.reasons), true);
+assert.deepEqual(JSON.parse(JSON.stringify(proof)), proof);
+const verifiedProof = contribution.verifyCollateralEligibilityProof(
+  JSON.parse(JSON.stringify(proof)), registeredRule
+);
+assert.equal(verifiedProof.integrity, "VERIFIED");
+assert.equal(verifiedProof.replay, "VERIFIED");
+assert.equal(verifiedProof.recordedDecision, "SATISFIED");
+assert.equal(verifiedProof.determinationAuthority, "NOT_ESTABLISHED_BY_PROOF_VERIFICATION");
+
+const keyOrderVariant = {
+  expectedFactRefs: [...synthetic.expectedFactRefs],
+  mappings: synthetic.mappings.map((mapping) => ({
+    status: mapping.status, mappingVersion: mapping.mappingVersion, mappingId: mapping.mappingId,
+    sourcePath: mapping.sourcePath, factRef: mapping.factRef,
+  })),
+  sourceReference: synthetic.sourceReference,
+  sourceObject: { arbitrary: { zero: 0, token: "synthetic-value" } },
+};
+assert.equal(contribution.createCollateralEligibilityProof(keyOrderVariant, evidence, context, registeredRule)
+  .commitment.digest, proof.commitment.digest, "Object insertion order does not affect canonical commitments");
+const orderedArrayVariant = structuredClone(synthetic);
+orderedArrayVariant.sourceObject.arbitrary.sequence = ["first", "second"];
+const reversedArrayVariant = structuredClone(orderedArrayVariant);
+reversedArrayVariant.sourceObject.arbitrary.sequence.reverse();
+assert.notEqual(
+  contribution.createCollateralEligibilityProof(orderedArrayVariant, evidence, context, registeredRule)
+    .commitment.digest,
+  contribution.createCollateralEligibilityProof(reversedArrayVariant, evidence, context, registeredRule)
+    .commitment.digest,
+  "Array order remains significant"
+);
+
+const invalidEvidence = [...evidence, { evidenceId: "rejected-evidence", observedValue: true }];
+const diagnosticsProof = contribution.createCollateralEligibilityProof(synthetic, invalidEvidence, context);
+assert.ok(diagnosticsProof.assessment.evaluation.evidenceDiagnostics
+  .some((reason) => reason.code === "EVIDENCE_INVALID"));
+assert.deepEqual(diagnosticsProof.replay.evidence.value, invalidEvidence);
+assert.equal(contribution.verifyCollateralEligibilityProof(diagnosticsProof).replay, "VERIFIED");
+
+const absentEvidenceProof = contribution.createCollateralEligibilityProof(synthetic, undefined, context);
+const nullEvidenceProof = contribution.createCollateralEligibilityProof(synthetic, null, context);
+assert.equal(absentEvidenceProof.replay.evidence.status, "ABSENT");
+assert.equal(nullEvidenceProof.replay.evidence.status, "NULL");
+assert.notEqual(absentEvidenceProof.commitment.digest, nullEvidenceProof.commitment.digest);
+for (const missingOrInvalid of [
+  absentEvidenceProof,
+  contribution.createCollateralEligibilityProof(synthetic, invalidEvidence, context),
+]) {
+  assert.equal(missingOrInvalid.assessment.evaluation.decision, "RULE_NOT_CONFIGURED");
+  assert.equal(missingOrInvalid.assessment.evaluation.rule, null);
+  assert.ok(missingOrInvalid.assessment.evaluation.reasons
+    .some((reason) => reason.code === "AUTHORITATIVE_RULE_NOT_CONFIGURED"));
+  assert.equal(contribution.verifyCollateralEligibilityProof(missingOrInvalid).replay, "VERIFIED");
+  assert.equal(contribution.verifyCollateralEligibilityProof(missingOrInvalid).recordedDecision, "RULE_NOT_CONFIGURED");
+}
+
+const otherVersion = ruleRegistryForContribution.select("synthetic-versioned-rule", "test-v2");
+assert.equal(contribution.verifyCollateralEligibilityProof(proof, otherVersion).replay, "UNAVAILABLE");
+assert.equal(contribution.verifyCollateralEligibilityProof(proof).replay, "UNAVAILABLE");
+assert.equal(contribution.verifyCollateralEligibilityProof(proof, forgedHandle).replay, "UNAVAILABLE");
+const mismatchedMetadata = syntheticMetadata("synthetic-versioned-rule", "test-v1");
+mismatchedMetadata.sourceDocument.value.title = "Different synthetic document";
+const mismatchedCatalog = new contribution.CollateralEligibilityRuleCatalog();
+const mismatchedRegistration = mismatchedCatalog.register(
+  syntheticDefinition(mismatchedMetadata, () => outputFor(mismatchedMetadata)),
+  syntheticAdmission(mismatchedMetadata)
+);
+assert.equal(mismatchedRegistration.ok, true);
+const metadataMismatchResult = contribution.verifyCollateralEligibilityProof(proof, mismatchedRegistration.handle);
+assert.equal(metadataMismatchResult.integrity, "VERIFIED");
+assert.equal(metadataMismatchResult.replay, "UNAVAILABLE");
+assert.ok(metadataMismatchResult.reasons.some((reason) => reason.code === "RULE_METADATA_MISMATCH"));
+const inconsistentMetadata = structuredClone(proof);
+inconsistentMetadata.assessment.evaluation.ruleMetadata.ruleVersion = "test-v2";
+assert.equal(contribution.verifyCollateralEligibilityProof(inconsistentMetadata, registeredRule).integrity, "FAILED");
+
+function canonicalizeTest(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalizeTest).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) =>
+    `${JSON.stringify(key)}:${canonicalizeTest(value[key])}`).join(",")}}`;
+}
+function rehashArtifact(artifact) {
+  const { commitment, ...payload } = structuredClone(artifact);
+  return {
+    ...payload,
+    commitment: {
+      algorithm: commitment.algorithm,
+      digest: createHash("sha256").update(canonicalizeTest(payload)).digest("hex"),
+    },
+  };
+}
+const callsBeforeTampering = versionOneCalls;
+for (const mutate of [
+  (artifact) => { artifact.replay.input.value.sourceReference = "tampered-reference"; },
+  (artifact) => { artifact.replay.evidence.value[0].observedValue = "tampered-evidence"; },
+  (artifact) => { artifact.assessment.mappings[0].sourcePath = "tampered.path"; },
+  (artifact) => { artifact.assessment.mappings[0].mappingVersion = "tampered-map-version"; },
+  (artifact) => { artifact.assessment.context.evaluatedAt = "2026-09-29T12:00:00.000Z"; },
+  (artifact) => { artifact.assessment.evaluation.rule.version = "test-v2"; },
+  (artifact) => { artifact.assessment.evaluation.decision = "NOT_SATISFIED"; },
+  (artifact) => { artifact.assessment.evaluation.reasons[0].message = "tampered reason"; },
+  (artifact) => { artifact.assessment.facts[0].observedValue = "tampered fact"; },
+]) {
+  const tampered = structuredClone(proof);
+  mutate(tampered);
+  const result = contribution.verifyCollateralEligibilityProof(tampered, registeredRule);
+  assert.equal(result.integrity, "FAILED");
+  assert.equal(result.replay, "NOT_ATTEMPTED");
+}
+const embeddedExecutable = structuredClone(proof);
+embeddedExecutable.execute = () => { throw new Error("artifact code must never run"); };
+assert.equal(contribution.verifyCollateralEligibilityProof(embeddedExecutable, registeredRule).integrity, "FAILED");
+assert.equal(versionOneCalls, callsBeforeTampering, "Integrity failures must not invoke a registered callback");
+const staleState = structuredClone(proof);
+staleState.operationalState.freshness = "FRESH";
+const rehashedStaleState = rehashArtifact(staleState);
+const stateMismatch = contribution.verifyCollateralEligibilityProof(rehashedStaleState, registeredRule);
+assert.equal(stateMismatch.integrity, "VERIFIED");
+assert.equal(stateMismatch.replay, "MISMATCH");
+assert.ok(stateMismatch.reasons.some((reason) => reason.code === "SUBJECT_STATE_MISMATCH"));
+const coherentPayloadWithOldCommitment = rehashArtifact(proof);
+coherentPayloadWithOldCommitment.replay.input.value.sourceReference = "altered-with-new-hash";
+const rehashedInconsistentInput = rehashArtifact(coherentPayloadWithOldCommitment);
+const callsBeforeInconsistentReplay = versionOneCalls;
+const inconsistentReplayResult = contribution.verifyCollateralEligibilityProof(rehashedInconsistentInput, registeredRule);
+assert.equal(inconsistentReplayResult.replay, "MISMATCH",
+  "A recomputed hash does not bypass deterministic replay");
+assert.equal(versionOneCalls, callsBeforeInconsistentReplay,
+  "Input/normalization inconsistencies are rejected before rule callback execution");
+
+const coherentEdited = structuredClone(proof);
+coherentEdited.replay.input.value.sourceObject.note = "coherent edit";
+coherentEdited.assessment.input.sourceObject.note = "coherent edit";
+assert.equal(contribution.verifyCollateralEligibilityProof(rehashArtifact(coherentEdited), registeredRule).replay,
+  "VERIFIED", "A coherent edit and new self-commitment cannot establish original authenticity");
+for (const mutate of [
+  (artifact) => { artifact.schemaVersion = 2; },
+  (artifact) => { artifact.pipelineVersion = "unknown-pipeline"; },
+  (artifact) => { artifact.normalizationVersion = "unknown-normalizer"; },
+  (artifact) => { artifact.commitment.algorithm = "SHA-512"; },
+]) {
+  const unsupported = structuredClone(proof);
+  mutate(unsupported);
+  const result = contribution.verifyCollateralEligibilityProof(unsupported, registeredRule);
+  assert.equal(result.replay, "NOT_ATTEMPTED");
+}
+const malformedArtifact = structuredClone(proof);
+malformedArtifact.replay.input.value = Number.NaN;
+assert.equal(contribution.verifyCollateralEligibilityProof(malformedArtifact, registeredRule).integrity, "FAILED");
+const malformedAssessment = structuredClone(proof);
+delete malformedAssessment.assessment.facts[0].mappingVersion;
+const callsBeforeMalformedReplay = versionOneCalls;
+const malformedAssessmentResult = contribution.verifyCollateralEligibilityProof(
+  rehashArtifact(malformedAssessment), registeredRule
+);
+assert.equal(malformedAssessmentResult.integrity, "FAILED");
+assert.equal(malformedAssessmentResult.replay, "NOT_ATTEMPTED");
+assert.equal(versionOneCalls, callsBeforeMalformedReplay,
+  "Malformed assessment schemas must be rejected before callback execution");
+let accessorCalls = 0;
+const accessorInput = {
+  sourceReference: "synthetic-accessor-input",
+  get sourceObject() {
+    accessorCalls += 1;
+    return {};
+  },
+};
+assert.throws(() => contribution.createCollateralEligibilityProof(accessorInput, evidence, context), TypeError);
+assert.equal(accessorCalls, 0, "Unsupported accessors are rejected without invoking them");
+const cyclicInput = {};
+cyclicInput.self = cyclicInput;
+assert.throws(() => contribution.createCollateralEligibilityProof(cyclicInput, evidence, context), /cycles/);
+assert.throws(() => contribution.createCollateralEligibilityProof(
+  { sourceReference: "non-finite", sourceObject: { value: Number.POSITIVE_INFINITY } }, evidence, context
+), /strict JSON/);
+
+console.log("Contribution boundary, provenance, proof artifact, replay and reference regression tests passed");
