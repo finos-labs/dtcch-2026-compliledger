@@ -98,7 +98,7 @@ export function SGHero(): ReactNode {
             ease: [0.25, 0.46, 0.45, 0.94],
           }}
         >
-          SettlementGuard enforces compliance deterministically, before the
+          CompliOpen enforces compliance deterministically, before the
           moment of irreversibility. Cryptographic proof at institutional scale.
         </motion.p>
 

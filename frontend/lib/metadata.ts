@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const siteConfig = {
-  name: "SettlementGuard — Proof at Scale",
+  name: "CompliOpen — Proof at Scale",
   description:
     "Compliance-native settlement enforcement for tokenized markets. Deterministic cryptographic proof before finality.",
   url: "https://settlementguard.io",
@@ -9,7 +9,7 @@ export const siteConfig = {
   creator: "@settlementguard",
   authors: [
     {
-      name: "SettlementGuard",
+      name: "CompliOpen",
       url: "https://settlementguard.io",
     },
   ],

@@ -4,7 +4,7 @@ set -euo pipefail
 LEDGER_API="${CANTON_LEDGER_API_URL:-http://localhost:7575}"
 DAR_FILE="$(dirname "$0")/.daml/dist/settlement-guard-1.0.0.dar"
 
-echo "==> Canton SettlementGuard Setup"
+echo "==> Canton CompliOpen Setup"
 echo "    Ledger API: $LEDGER_API"
 
 wait_healthy() {

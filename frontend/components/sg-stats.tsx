@@ -173,7 +173,7 @@ export function SGStats(): ReactNode {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              SettlementGuard doesn&apos;t just improve compliance — it replaces
+              CompliOpen doesn&apos;t just improve compliance — it replaces
               the need for trust with deterministic, cryptographic proof.
             </motion.p>
 
@@ -186,7 +186,7 @@ export function SGStats(): ReactNode {
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-linear-to-r from-accent to-accent-light" />
                 <span className="text-xs font-medium text-foreground">
-                  SettlementGuard
+                  CompliOpen
                 </span>
               </div>
               <div className="flex items-center gap-2">

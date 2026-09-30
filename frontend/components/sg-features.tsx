@@ -40,7 +40,7 @@ const features: Feature[] = [
     icon: CheckCircle2,
     title: "Cryptographic Settlement Attestation",
     description:
-      "If and only if all checks pass, SettlementGuard issues a digitally signed attestation. Cryptographically bound to the proof bundle — machine-verifiable evidence, not a compliance checkbox.",
+      "If and only if all checks pass, CompliOpen issues a digitally signed attestation. Cryptographically bound to the proof bundle — machine-verifiable evidence, not a compliance checkbox.",
   },
   {
     icon: Anchor,
@@ -71,7 +71,7 @@ const features: Feature[] = [
     icon: Zap,
     title: "Pre-Finality Enforcement",
     description:
-      "SettlementGuard acts before settlement becomes irreversible. If a proof check fails, no attestation is issued. Without an attestation, settlement does not proceed.",
+      "CompliOpen acts before settlement becomes irreversible. If a proof check fails, no attestation is issued. Without an attestation, settlement does not proceed.",
     accent: true,
   },
 ];

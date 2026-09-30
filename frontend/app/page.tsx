@@ -11,7 +11,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = createMetadata({
-  title: "SettlementGuard — Proof at Scale",
+  title: "CompliOpen — Proof at Scale",
   description: `Welcome to ${siteConfig.name}. ${siteConfig.description}`,
   path: "/",
 });
@@ -24,7 +24,7 @@ export default function HomePage(): ReactNode {
       <main id="main-content" className="flex-1">
         <SGHero />
 
-        {/* SettlementGuard vs Traditional */}
+        {/* CompliOpen vs Traditional */}
         <SGComparison />
 
         {/* Scenario Selector + Proof Chain */}

@@ -8,7 +8,7 @@
  */
 
 export const siteConfig = {
-  name: "SettlementGuard",
+  name: "CompliOpen",
   tagline: "Proof at Scale",
   description:
     "Compliance-native settlement enforcement for tokenized markets. Deterministic proof before finality — cryptographically, at scale.",

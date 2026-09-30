@@ -20,7 +20,7 @@ const audiences: AudienceMessage[] = [
     audience: "Risk Officers & Compliance Teams",
     title: "Eliminate the compliance gap",
     points: [
-      "SettlementGuard eliminates the gap between when a trade settles and when compliance is verified.",
+      "CompliOpen eliminates the gap between when a trade settles and when compliance is verified.",
       "Every settlement decision is provable, reproducible, and independently verifiable — not a matter of trust.",
       "If the proof doesn\u2019t exist, settlement doesn\u2019t happen. That\u2019s not a policy. That\u2019s enforcement.",
     ],
@@ -31,7 +31,7 @@ const audiences: AudienceMessage[] = [
     audience: "CTOs & Infrastructure Architects",
     title: "Drop-in enforcement layer",
     points: [
-      "SettlementGuard does not replace your settlement rails — it strengthens them.",
+      "CompliOpen does not replace your settlement rails — it strengthens them.",
       "Hybrid architecture: sensitive data stays off-chain. Cryptographic commitments go on-chain.",
       "Asset-agnostic design means one integration supports tokenized Treasuries, stablecoins, and future asset classes.",
     ],
@@ -43,7 +43,7 @@ const audiences: AudienceMessage[] = [
     title: "The new standard for settlement",
     points: [
       "As tokenized asset markets scale, retrospective compliance will not be acceptable to regulators or institutional counterparties.",
-      "SettlementGuard is the infrastructure layer that makes proof-based settlement the new standard.",
+      "CompliOpen is the infrastructure layer that makes proof-based settlement the new standard.",
       "Organizations that adopt enforcement-first infrastructure today become the proven settlement venues of tomorrow.",
     ],
   },
@@ -94,7 +94,7 @@ export function SGMessages(): ReactNode {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             Tokenized markets move at machine speed. Compliance must too.
-            SettlementGuard enforces proof — deterministically, before finality.
+            CompliOpen enforces proof — deterministically, before finality.
           </motion.p>
         </div>
 

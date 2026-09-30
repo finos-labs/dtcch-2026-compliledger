@@ -76,11 +76,11 @@ export function SGHeader(): ReactNode {
             <Link
               href="/"
               className="focus-ring flex items-center gap-2.5"
-              aria-label="SettlementGuard home"
+              aria-label="CompliOpen home"
             >
               <SGLogo className="h-7 w-7 text-white" />
               <span className="text-lg font-semibold tracking-tight text-white">
-                SettlementGuard
+                CompliOpen
               </span>
             </Link>
           </motion.div>

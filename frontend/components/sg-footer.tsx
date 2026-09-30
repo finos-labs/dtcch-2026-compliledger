@@ -69,7 +69,7 @@ export function SGFooter(): ReactNode {
                   <SGLogo className="h-5 w-5 text-accent-foreground" />
                 </div>
                 <span className="text-lg font-semibold tracking-tight text-foreground">
-                  SettlementGuard
+                  CompliOpen
                 </span>
               </div>
 
@@ -192,7 +192,7 @@ function FooterParallaxText(): ReactNode {
         aria-hidden="true"
       >
         <span className="block w-full whitespace-nowrap text-center text-[11vw] font-black leading-none tracking-tighter text-accent/[0.15] dark:text-foreground/[0.05]">
-          SETTLEMENTGUARD
+          COMPLIOPEN
         </span>
       </motion.div>
     </div>

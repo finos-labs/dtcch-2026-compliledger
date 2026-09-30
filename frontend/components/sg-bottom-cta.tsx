@@ -15,7 +15,7 @@ export function SGBottomCTA(): ReactNode {
               Start your proof-based settlement pilot
             </h2>
             <p className="mt-3 max-w-md text-lg text-muted-foreground">
-              Deploy SettlementGuard in your environment. We handle the
+              Deploy CompliOpen in your environment. We handle the
               integration. You own the proof.
             </p>
 

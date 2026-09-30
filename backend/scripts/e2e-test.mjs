@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SettlementGuard — End-to-End Backend Test Suite
+ * CompliOpen — End-to-End Backend Test Suite
  *
  * Covers every route, happy-path + error-path, and state-dependent flows
  * (intent → verify → anchor). No external test framework needed.
@@ -109,7 +109,7 @@ async function checkConnectivity() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 async function main() {
-  console.log(BOLD(`\n  SettlementGuard — E2E Backend Test Suite`));
+  console.log(BOLD(`\n  CompliOpen — E2E Backend Test Suite`));
   console.log(DIM(`  ${BASE}\n`));
 
   await checkConnectivity();

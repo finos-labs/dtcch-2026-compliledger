@@ -3,7 +3,7 @@
  * Canton Anchor Smoke Test
  *
  * End-to-end smoke test that submits a known-passing intent to the
- * SettlementGuard backend and anchors the resulting attestation. Verifies
+ * CompliOpen backend and anchors the resulting attestation. Verifies
  * that the anchor response either:
  *   1. Contains a real Canton `transaction_id` and `contract_id`, OR
  *   2. Is a clear fallback response indicating Canton is unavailable
