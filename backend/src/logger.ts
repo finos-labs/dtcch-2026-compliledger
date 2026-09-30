@@ -4,7 +4,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 export const logger = pino({
   level: process.env.LOG_LEVEL || "info",
-  base: { service: "settlementguard", version: "0.3.0" },
+  base: { service: "compliopen", version: "0.3.0" },
   timestamp: pino.stdTimeFunctions.isoTime,
   ...(isDev && {
     transport: {

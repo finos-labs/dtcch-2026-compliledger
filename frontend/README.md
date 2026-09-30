@@ -1,6 +1,6 @@
 <div align="center">
 
-# SettlementGuard
+# CompliOpen
 
 ### Proof at Scale
 
@@ -20,13 +20,13 @@
 
 ---
 
-## What is SettlementGuard?
+## What is CompliOpen?
 
-SettlementGuard sits at the intersection of financial compliance and cryptographic proof. It is not a settlement system, a custody platform, or a compliance registry.
+CompliOpen sits at the intersection of financial compliance and cryptographic proof. It is not a settlement system, a custody platform, or a compliance registry.
 
 **It is the enforcement layer that sits between a settlement intent and settlement finality** — and either proves it should proceed, or stops it.
 
-> *SettlementGuard = The last gate before settlement is final.*
+> *CompliOpen = The last gate before settlement is final.*
 
 ### Who It's For
 
@@ -36,7 +36,7 @@ Banks, custodians, stablecoin issuers, tokenized fund platforms, central securit
 
 ## The Core Shift
 
-| Category | Traditional Settlement | SettlementGuard |
+| Category | Traditional Settlement | CompliOpen |
 |:--|:--|:--|
 | **Enforcement timing** | Post-trade audit | Pre-finality proof |
 | **Compliance method** | Periodic review | Deterministic check |
@@ -76,7 +76,7 @@ If all checks pass, a digitally signed attestation is issued. Cryptographically 
 Proof bundle hash and attestation hash are written to an institutional blockchain. Permanent, tamper-resistant timestamps that any authorized party can independently verify.
 
 ### 5. Independent Verification
-Paste an attestation JSON and signature — SettlementGuard confirms cryptographic validity, proof bundle existence, and on-chain anchoring. Tampering is immediately detectable.
+Paste an attestation JSON and signature — CompliOpen confirms cryptographic validity, proof bundle existence, and on-chain anchoring. Tampering is immediately detectable.
 
 ### 6. Asset-Agnostic Enforcement
 Tokenized Treasuries, stablecoins, and real-world assets. Same enforcement structure, same proof chain — only input rules change per asset type.
@@ -92,9 +92,9 @@ Acts before settlement becomes irreversible. No proof = no attestation = no sett
 ## Frontend Architecture
 
 ```
-settlementguard/
+frontend/
 ├── app/
-│   ├── globals.css              # SettlementGuard design tokens (emerald/teal)
+│   ├── globals.css              # CompliOpen design tokens (emerald/teal)
 │   ├── layout.tsx               # Root layout with Geist fonts & providers
 │   └── page.tsx                 # Page composition — all sections
 │
@@ -102,7 +102,7 @@ settlementguard/
 │   ├── sg-header.tsx            # Animated header with scroll-hide behavior
 │   ├── sg-hero.tsx              # Hero with parallax & positioning statement
 │   ├── sg-features.tsx          # 8 core features in animated card grid
-│   ├── sg-comparison.tsx        # Traditional vs SettlementGuard comparison table
+│   ├── sg-comparison.tsx        # Traditional vs CompliOpen comparison table
 │   ├── sg-messages.tsx          # Audience-segmented messaging (tabbed)
 │   ├── sg-demo.tsx              # Interactive 4-scenario proof chain demo
 │   ├── sg-ui-sections.tsx       # Interface walkthrough (5-step flow)
@@ -146,8 +146,8 @@ The interface features four pre-set scenarios that tell a complete compliance st
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd settlementguard
+git clone https://github.com/finos-labs/dtcch-2026-compliledger.git
+cd dtcch-2026-compliledger/frontend
 
 # Install dependencies
 npm install
@@ -170,7 +170,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ### Color Tokens
 
-SettlementGuard uses a custom emerald/teal palette designed for institutional compliance contexts:
+CompliOpen uses a custom emerald/teal palette designed for institutional compliance contexts:
 
 | Token | Light | Dark | Purpose |
 |:--|:--|:--|:--|
@@ -210,12 +210,12 @@ SettlementGuard uses a custom emerald/teal palette designed for institutional co
 ### Avoid These Words
 - **Dashboard** — implies observation, not enforcement
 - **Registry** — implies record-keeping, not proof production
-- **Trust** — SettlementGuard eliminates the need for it
+- **Trust** — CompliOpen eliminates the need for it
 - **Automatic** — undersells deterministic cryptographic precision
 
 ### The Single Sentence
 
-> *SettlementGuard enforces compliance before settlement is final — deterministically, cryptographically, at scale.*
+> *CompliOpen enforces compliance before settlement is final — deterministically, cryptographically, at scale.*
 
 ---
 
@@ -240,7 +240,7 @@ Edit `lib/config.ts` to customize branding and navigation:
 
 ```typescript
 export const siteConfig = {
-  name: "SettlementGuard",
+  name: "CompliOpen",
   tagline: "Proof at Scale",
   description: "Compliance-native settlement enforcement for tokenized markets.",
   url: "https://settlementguard.io",
@@ -273,7 +273,7 @@ MIT
 
 <div align="center">
 
-**SettlementGuard** — Proof at Scale
+**CompliOpen** — Proof at Scale
 
 *Compliance-Native Settlement Enforcement for Tokenized Markets*
 

@@ -11,7 +11,7 @@ const steps = [
     number: "01",
     title: "Settlement Intent Submitted",
     description:
-      "An institution initiates settlement. SettlementGuard intercepts the request before finality — this is the enforcement window.",
+      "An institution initiates settlement. CompliOpen intercepts the request before finality — this is the enforcement window.",
     detail: "Asset type, counterparties, and parameters are captured.",
   },
   {

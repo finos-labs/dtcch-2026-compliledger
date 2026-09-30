@@ -102,7 +102,7 @@ export function PagePreloader(): ReactNode {
           >
             <SGLogo className="h-5 w-5 text-accent" />
             <span className="text-lg font-semibold tracking-tight text-foreground">
-              SettlementGuard
+              CompliOpen
             </span>
           </motion.div>
 

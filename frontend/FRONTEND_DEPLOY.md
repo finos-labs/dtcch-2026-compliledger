@@ -1,4 +1,4 @@
-# SettlementGuard — Frontend Deploy & Test Guide
+# CompliOpen — Frontend Deploy & Test Guide
 
 > For the frontend team. Everything needed to run locally, test against the live backend, and deploy to Netlify.
 

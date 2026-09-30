@@ -1,4 +1,4 @@
-# SettlementGuard — Canton Integration
+# CompliOpen — Canton Integration
 
 On-ledger commitment registry using Daml smart contracts on Canton Network.
 

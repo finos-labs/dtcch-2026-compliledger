@@ -1,6 +1,6 @@
 module SettlementGuard.CommitmentRegistry where
 
--- | On-ledger record of a SettlementGuard compliance commitment.
+-- | On-ledger record of a CompliOpen compliance commitment.
 -- Created by the submitter, co-signed by the custodian via AnchorCommitment.
 -- The existence of this contract on Canton IS the immutable attestation.
 template SettlementCommitment

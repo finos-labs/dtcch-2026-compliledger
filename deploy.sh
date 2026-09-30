@@ -15,7 +15,7 @@ ALB_DNS="settlementguard-alb-1419322607.us-east-2.elb.amazonaws.com"
 
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  SettlementGuard — AWS ECS Fargate Deploy"
+echo "  CompliOpen — AWS ECS Fargate Deploy"
 echo "  Commit: ${IMAGE_TAG}  |  Region: ${REGION}"
 echo "═══════════════════════════════════════════════════════"
 

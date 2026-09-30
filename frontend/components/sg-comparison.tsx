@@ -151,10 +151,10 @@ export function SGComparison(): ReactNode {
             The Core Shift
           </p>
           <h2 className="mb-6 text-3xl font-medium tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
-            SettlementGuard vs. Traditional
+            CompliOpen vs. Traditional
           </h2>
           <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            SettlementGuard is the last gate before settlement is final. Not a
+            CompliOpen is the last gate before settlement is final. Not a
             settlement system, not a custody platform — the enforcement layer.
           </p>
           <motion.button
@@ -231,7 +231,7 @@ export function SGComparison(): ReactNode {
                 <div className="grid grid-cols-2 gap-px bg-foreground/5">
                   <div className="bg-background p-6">
                     <div className="mb-3 text-base font-bold text-accent">
-                      SettlementGuard
+                      CompliOpen
                     </div>
                     <div className="flex items-center justify-start">
                       {typeof feature.guard === "boolean" ? (
@@ -330,7 +330,7 @@ export function SGComparison(): ReactNode {
                 </div>
               </div>
 
-              {/* Column 2 - SettlementGuard (Highlighted) */}
+              {/* Column 2 - CompliOpen (Highlighted) */}
               <div className="relative overflow-hidden px-12 py-8">
                 <div
                   className="absolute inset-0 z-0"
@@ -341,7 +341,7 @@ export function SGComparison(): ReactNode {
                 />
                 <div className="relative z-10 text-center">
                   <div className="mb-1 text-2xl font-bold text-foreground">
-                    SettlementGuard
+                    CompliOpen
                   </div>
                   <div className="text-sm font-medium text-accent">
                     ENFORCEMENT ↗
@@ -382,7 +382,7 @@ export function SGComparison(): ReactNode {
                   </div>
                 </div>
 
-                {/* SettlementGuard Value */}
+                {/* CompliOpen Value */}
                 <div className="bg-background px-12 py-8">
                   <motion.div
                     key={`${selectedClass}-guard-${feature.title}`}

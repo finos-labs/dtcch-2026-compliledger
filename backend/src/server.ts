@@ -588,7 +588,7 @@ app.post("/v1/demo/evaluate", (req, res) => {
 
 // GET /health — Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "SettlementGuard", version: "0.3.0" });
+  res.json({ status: "ok", service: "CompliOpen", version: "0.3.0" });
 });
 
 function getPresetDescription(id: string): string {
@@ -602,7 +602,7 @@ function getPresetDescription(id: string): string {
 }
 
 const server = app.listen(PORT, () => {
-  logger.info({ port: PORT, signing_provider: getSigningProvider() }, "SettlementGuard backend started");
+  logger.info({ port: PORT, signing_provider: getSigningProvider() }, "CompliOpen backend started");
 });
 
 function gracefulShutdown(signal: string): void {

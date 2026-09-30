@@ -37,7 +37,7 @@ const topFunnel: CTACard[] = [
   {
     icon: Download,
     label: "Secondary CTA",
-    title: "Download the SettlementGuard Overview",
+    title: "Download the CompliOpen Overview",
     description:
       "The non-technical guide to proof-based settlement enforcement.",
     href: "#",
@@ -59,7 +59,7 @@ const midFunnel: CTACard[] = [
     label: "Education CTA",
     title: "Understand the Canonical Proof Chain",
     description:
-      "A step-by-step walkthrough of how SettlementGuard evaluates a settlement intent.",
+      "A step-by-step walkthrough of how CompliOpen evaluates a settlement intent.",
     href: "#features",
   },
 ];
@@ -70,7 +70,7 @@ const bottomFunnel: CTACard[] = [
     label: "Integration CTA",
     title: "Start Your Proof-Based Settlement Pilot",
     description:
-      "Deploy SettlementGuard in your environment. We handle the integration. You own the proof.",
+      "Deploy CompliOpen in your environment. We handle the integration. You own the proof.",
     href: "#",
     primary: true,
   },
@@ -79,7 +79,7 @@ const bottomFunnel: CTACard[] = [
     label: "Enterprise CTA",
     title: "Request a Technical Architecture Review",
     description:
-      "Work with our team to map SettlementGuard to your settlement infrastructure.",
+      "Work with our team to map CompliOpen to your settlement infrastructure.",
     href: "#",
   },
 ];

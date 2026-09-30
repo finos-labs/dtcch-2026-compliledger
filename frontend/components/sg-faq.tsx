@@ -11,9 +11,9 @@ interface FAQItem {
 
 const faqs: FAQItem[] = [
   {
-    question: "What is SettlementGuard?",
+    question: "What is CompliOpen?",
     answer:
-      "SettlementGuard is the enforcement layer that sits between a settlement intent and settlement finality. It deterministically evaluates compliance through a Canonical Proof Chain and either proves the settlement should proceed — or stops it. It is not a settlement system, a custody platform, or a compliance monitor.",
+      "CompliOpen is the enforcement layer that sits between a settlement intent and settlement finality. It deterministically evaluates compliance through a Canonical Proof Chain and either proves the settlement should proceed — or stops it. It is not a settlement system, a custody platform, or a compliance monitor.",
   },
   {
     question: "How does the Canonical Proof Chain work?",
@@ -26,24 +26,24 @@ const faqs: FAQItem[] = [
       "If any single check in the Canonical Proof Chain fails, no attestation is issued. Without an attestation, settlement does not proceed. The specific failure reason is recorded in the sealed proof bundle — providing a clear, auditable record of why the settlement was blocked.",
   },
   {
-    question: "What asset types does SettlementGuard support?",
+    question: "What asset types does CompliOpen support?",
     answer:
-      "SettlementGuard is asset-agnostic. The same enforcement structure applies to tokenized Treasuries, stablecoins, and other real-world assets. Only the input rules change by asset type. The proof chain, bundle structure, and attestation format are identical across asset classes.",
+      "CompliOpen is asset-agnostic. The same enforcement structure applies to tokenized Treasuries, stablecoins, and other real-world assets. Only the input rules change by asset type. The proof chain, bundle structure, and attestation format are identical across asset classes.",
   },
   {
     question: "How is sensitive data protected?",
     answer:
-      "SettlementGuard uses a hybrid architecture. Proof evaluation runs off-chain in a secure enterprise environment (AWS or equivalent), keeping sensitive data private. Only cryptographic hashes — not the underlying data — are anchored on-chain. This gives you the privacy of off-chain processing with the tamper-resistance of on-chain commitment.",
+      "CompliOpen uses a hybrid architecture. Proof evaluation runs off-chain in a secure enterprise environment (AWS or equivalent), keeping sensitive data private. Only cryptographic hashes — not the underlying data — are anchored on-chain. This gives you the privacy of off-chain processing with the tamper-resistance of on-chain commitment.",
   },
   {
     question: "Can regulators independently verify settlements?",
     answer:
-      "Yes. Any authorized party can verify a settlement attestation at any time by pasting the attestation JSON and signature. SettlementGuard confirms whether the cryptographic signature is valid, whether the proof bundle exists, and whether the commitment is anchored on-chain. Tampering is immediately detectable.",
+      "Yes. Any authorized party can verify a settlement attestation at any time by pasting the attestation JSON and signature. CompliOpen confirms whether the cryptographic signature is valid, whether the proof bundle exists, and whether the commitment is anchored on-chain. Tampering is immediately detectable.",
   },
   {
-    question: "Does SettlementGuard replace existing settlement infrastructure?",
+    question: "Does CompliOpen replace existing settlement infrastructure?",
     answer:
-      "No. SettlementGuard is a drop-in enforcement layer. It does not replace your settlement rails — it strengthens them. It sits between the settlement intent and settlement finality, adding deterministic compliance enforcement without disrupting your existing workflows.",
+      "No. CompliOpen is a drop-in enforcement layer. It does not replace your settlement rails — it strengthens them. It sits between the settlement intent and settlement finality, adding deterministic compliance enforcement without disrupting your existing workflows.",
   },
 ];
 

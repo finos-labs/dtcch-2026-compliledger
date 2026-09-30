@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# CompliLedger — SettlementGuard
+# CompliLedger — CompliOpen
 
 ### Deterministic Validation &amp; Attestation for CDM-Aligned Tokenized Workflows
 
@@ -17,15 +17,20 @@
 
 > **Regulation is shifting from static reporting to real-time, verifiable compliance.**
 >
-> SettlementGuard introduces a **deterministic validation and attestation layer** for tokenized financial workflows aligned with **CDM lifecycle events**, **ISDA / ISLA / ICMA** market standards, and emerging **digital asset policy frameworks**.
+> CompliOpen introduces a **deterministic validation and attestation layer** for tokenized financial workflows aligned with **CDM lifecycle events**, **ISDA / ISLA / ICMA** market standards, and emerging **digital asset policy frameworks**.
 
-> 🔗 SettlementGuard is actively being explored as a **CDM-aligned validation and attestation pattern** within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
+> 🔗 CompliOpen is actively being explored as a **CDM-aligned validation and attestation pattern** within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
+
+CompliOpen is CompliLedger's open-source implementation and contribution surface. This repository's immediate FINOS/CDM use case is evidence-backed collateral eligibility; CompliOpen is not limited to that use case. The project began as SettlementGuard, CompliLedger's DTCC hackathon project. This repository does not identify or implement an authoritative FINOS, ISDA, ISLA, or ICMA collateral eligibility rule.
+
+See [the rename and compatibility note](docs/RENAME.md) for the retained
+historical, signed-evidence, ledger, authentication, and external identifiers.
 
 ---
 
-## What SettlementGuard Is — and Is Not
+## What CompliOpen Is — and Is Not
 
-| | SettlementGuard **is not** | | SettlementGuard **is** |
+| | CompliOpen **is not** | | CompliOpen **is** |
 |---|---|---|---|
 | ✕ | An execution system | ✓ | A deterministic validation and attestation layer |
 | ✕ | A broker-dealer | ✓ | Aligned to CDM lifecycle events |
@@ -36,18 +41,18 @@
 
 ## Overview
 
-SettlementGuard is a **pre-settlement compliance attestation module** built by CompliLedger.
+CompliOpen is a **pre-settlement compliance attestation module** built by CompliLedger.
 
 It evaluates structured transaction inputs against deterministic, machine-readable rule sets (aligned with ISDA, ISLA, and ICMA) and produces **cryptographically verifiable proof artifacts** representing compliance-related conditions at a specific point in time.
 
-> SettlementGuard does not execute transactions, route orders, or make trading decisions.
+> CompliOpen does not execute transactions, route orders, or make trading decisions.
 > It generates independent, tamper-evident attestations and verifiable signals that external systems independently interpret as part of their own workflow continuation.
 
 ---
 
 ## Non-Intermediary Design
 
-SettlementGuard is explicitly designed as a **non-intermediary system**:
+CompliOpen is explicitly designed as a **non-intermediary system**:
 
 | | Capability |
 |---|---|
@@ -59,13 +64,13 @@ SettlementGuard is explicitly designed as a **non-intermediary system**:
 | ✅ | Operates outside of execution environments |
 | ✅ | Outputs verifiable signals, not instructions |
 
-> SettlementGuard outputs are informational and do not constitute transaction instructions or execution logic.
+> CompliOpen outputs are informational and do not constitute transaction instructions or execution logic.
 
 ---
 
 ## Core Function
 
-For each submitted transaction scenario ("intent"), SettlementGuard:
+For each submitted transaction scenario ("intent"), CompliOpen:
 
 1. Evaluates inputs against deterministic rule sets
 2. Generates a canonical proof bundle (deterministic JSON)
@@ -80,7 +85,7 @@ Each evaluation produces a **verifiable compliance state**, not an execution dec
 
 ## Evaluation Model
 
-SettlementGuard uses deterministic rule evaluation:
+CompliOpen uses deterministic rule evaluation:
 
 | Result | Meaning |
 |---|---|
@@ -92,19 +97,19 @@ These values represent **rule evaluation results only**. They do not approve, de
 
 In API responses, `decision_type: "evaluation"` accompanies OSS rule evaluation responses (`POST /v1/demo/evaluate`) and `decision_type: "enforcement"` accompanies proof-chain responses (`POST /v1/intents`). This separation is intentional.
 
-> **Note on the `"enforcement"` label:** `decision_type: "enforcement"` is an **internal reference implementation label** used to distinguish proof-chain responses from standalone OSS rule evaluation responses. It does **not** mean SettlementGuard authorizes, approves, denies, blocks, permits, or otherwise enforces a transaction. The response is a **proof-chain result** — a verifiable signal that external systems independently interpret. SettlementGuard performs no execution or enforcement action.
+> **Note on the `"enforcement"` label:** `decision_type: "enforcement"` is an **internal reference implementation label** used to distinguish proof-chain responses from standalone OSS rule evaluation responses. It does **not** mean CompliOpen authorizes, approves, denies, blocks, permits, or otherwise enforces a transaction. The response is a **proof-chain result** — a verifiable signal that external systems independently interpret. CompliOpen performs no execution or enforcement action.
 
 ---
 
 ## Role in the Transaction Lifecycle
 
-SettlementGuard operates **before execution and settlement**, as an independent attestation layer:
+CompliOpen operates **before execution and settlement**, as an independent attestation layer:
 
 ```mermaid
 flowchart TD
     TI(["📨 Transaction Intent"])
 
-    subgraph SG["SettlementGuard — Independent Attestation Layer"]
+    subgraph SG["CompliOpen — Independent Attestation Layer"]
         direction LR
         EVAL["Evaluate\nDeterministic Rule Engine"]
         ATTEST["Attest\nEd25519 Signed Proof Bundle"]
@@ -122,7 +127,7 @@ flowchart TD
     EXT --> EXEC --> CLR
 ```
 
-SettlementGuard is **not** part of the execution path.
+CompliOpen is **not** part of the execution path.
 
 ---
 
@@ -140,7 +145,7 @@ Today:
 - ⚠️ Evidence is often **generated after execution**, as audit reconstruction rather than as a precondition
 - ⚠️ Tokenized markets — where workflows are programmable and atomic — require **deterministic validation** and **independently verifiable evidence** *before* state progression
 
-> SettlementGuard explores how **regulatory and market conditions associated with CDM-defined events** can be evaluated **deterministically** and transformed into **cryptographically verifiable proof artifacts** *before* workflow progression.
+> CompliOpen explores how **regulatory and market conditions associated with CDM-defined events** can be evaluated **deterministically** and transformed into **cryptographically verifiable proof artifacts** *before* workflow progression.
 
 ---
 
@@ -153,30 +158,30 @@ Tokenized and programmable markets fundamentally change the role of validation. 
 - **Reproducible** — outcomes must be re-derivable from the same inputs at any future point in time
 - **Independently verifiable** — third parties must be able to validate evidence without re-running or trusting the issuer
 
-SettlementGuard is **complementary to CDM-defined workflows**: CDM describes *what* the lifecycle event is; SettlementGuard provides a uniform, deterministic way to evaluate the conditions surrounding that event and emit cryptographic evidence that any party — issuer, custodian, regulator, counterparty — can verify independently.
+CompliOpen is **complementary to CDM-defined workflows**: CDM describes *what* the lifecycle event is; CompliOpen provides a uniform, deterministic way to evaluate the conditions surrounding that event and emit cryptographic evidence that any party — issuer, custodian, regulator, counterparty — can verify independently.
 
 ---
 
 ## CDM-Aligned Architecture
 
-SettlementGuard is positioned as a **modular, workflow-independent layer** that sits alongside CDM and Canton / DAML, not inside them.
+CompliOpen is positioned as a **modular, workflow-independent layer** that sits alongside CDM and Canton / DAML, not inside them.
 
 | Layer | Responsibility |
 |---|---|
 | **CDM** | Standardized lifecycle and workflow representation |
-| **SettlementGuard** | Deterministic validation and attestation |
+| **CompliOpen** | Deterministic validation and attestation |
 | **Canton / DAML** | Workflow coordination, synchronization, and optional anchoring |
 
 Key architectural properties:
 
 - **Modularity** — validation logic is decoupled from workflow orchestration; rule packs evolve independently of contract code
-- **Workflow independence** — SettlementGuard never authors, advances, or blocks a workflow; it observes inputs and emits evidence
+- **Workflow independence** — CompliOpen never authors, advances, or blocks a workflow; it observes inputs and emits evidence
 - **Deterministic evaluation behavior** — given identical CDM-aligned inputs, the engine always produces the same proof bundle and the same attestation hash
 
 ```mermaid
 flowchart TD
     CDM["CDM TradeState / BusinessEvent"]
-    VAL["SettlementGuard Validation"]
+    VAL["CompliOpen Validation"]
     PROOF["Proof Bundle + Attestation"]
     CANTON["Canton / DAML Coordination"]
     EXT["External Systems / Workflow Progression"]
@@ -260,7 +265,7 @@ graph TD
 
 ## Alignment with Industry Standards
 
-SettlementGuard rule packs align with established market and regulatory standards. These standards define **market conditions**, not execution behavior — SettlementGuard encodes them as deterministic evaluation logic so the same condition is interpreted consistently across participants.
+CompliOpen rule packs align with established market and regulatory standards. These standards define **market conditions**, not execution behavior — CompliOpen encodes them as deterministic evaluation logic so the same condition is interpreted consistently across participants.
 
 | Standard / Framework | Example Validation Scope | Reference Rule Pack | OSS Demo Status |
 |---|---|---|---|
@@ -401,7 +406,7 @@ flowchart LR
 
 > **`same input → same output → same proof`**
 
-Determinism is the foundational property of SettlementGuard. Every rule evaluation is a pure function of its declared inputs and a versioned, machine-readable rule pack. There is no hidden state, no model inference, and no time-dependent behavior in the evaluation path.
+Determinism is the foundational property of CompliOpen. Every rule evaluation is a pure function of its declared inputs and a versioned, machine-readable rule pack. There is no hidden state, no model inference, and no time-dependent behavior in the evaluation path.
 
 This produces four properties that matter for tokenized financial infrastructure:
 
@@ -410,7 +415,7 @@ This produces four properties that matter for tokenized financial infrastructure
 - **Reduced interpretation variance** — the same regulatory or market condition is evaluated identically across participants, eliminating per-firm interpretation drift
 - **Independent verification** — third parties can verify the cryptographic attestation without trusting, contacting, or re-executing the issuer
 
-Determinism is what makes SettlementGuard suitable as a **shared validation primitive** for CDM-aligned workflows.
+Determinism is what makes CompliOpen suitable as a **shared validation primitive** for CDM-aligned workflows.
 
 ---
 
@@ -497,7 +502,7 @@ A passing evaluation returns `"decision": "PASS"` with an empty `reason_codes` a
 
 ## Canton Integration
 
-SettlementGuard anchors compliance commitments to Canton using Daml contracts defined in `canton/daml/SettlementGuard/CommitmentRegistry.daml`. The backend calls the Canton JSON Ledger API v2.
+CompliOpen anchors compliance commitments to Canton using Daml contracts defined in `canton/daml/SettlementGuard/CommitmentRegistry.daml`. The backend calls the Canton JSON Ledger API v2.
 
 - **Submit** — `POST /v2/commands/submit-and-wait` creates a `SettlementCommitment` contract
 - **Lookup** — `POST /v2/state/active-contracts` queries active commitments by attestation hash
@@ -505,7 +510,7 @@ SettlementGuard anchors compliance commitments to Canton using Daml contracts de
 
 ### LocalNet vs DevNet
 
-SettlementGuard is Canton-ready and can anchor to any configured Canton JSON Ledger API environment. The same backend code paths work against either a local sandbox or a shared DevNet participant — only the connection settings change.
+CompliOpen is Canton-ready and can anchor to any configured Canton JSON Ledger API environment. The same backend code paths work against either a local sandbox or a shared DevNet participant — only the connection settings change.
 
 | Environment | Purpose | Requirements |
 |---|---|---|
@@ -633,11 +638,11 @@ DYNAMO_TABLE=sg-commitment-registry
 
 ### CDM collateral eligibility provider boundary
 
-SettlementGuard can optionally attach a `cdm_eligibility_assessment` to the sealed bundle when
-`cdm_eligibility_request` is supplied. Phase 3 keeps SettlementGuard on an adapter boundary:
+CompliOpen can optionally attach a `cdm_eligibility_assessment` to the sealed bundle when
+`cdm_eligibility_request` is supplied. Phase 3 keeps CompliOpen on an adapter boundary:
 it deterministically validates evidence sufficiency, builds a normalized `EligibilityQuery` only
 when all required fields are supported by fresh non-conflicting evidence, and then calls a provider
-for `cdm.product.collateral.CheckEligibilityByDetails`. SettlementGuard does **not** recreate the
+for `cdm.product.collateral.CheckEligibilityByDetails`. CompliOpen does **not** recreate the
 CDM eligibility algorithm locally.
 
 - `ExternalCdmEligibilityProvider` sends the local adapter DTOs (`EligibleCollateralSpecification`
@@ -651,7 +656,7 @@ CDM eligibility algorithm locally.
   returns `NOT_EVALUABLE`; conflicting evidence, duplicate evidence IDs, or collateral/specification
   reference mismatches return `MANUAL_REVIEW`.
 - Provider failures are returned as explicit `NOT_EVALUABLE` assessments with
-  `CDM_EVALUATION_UNAVAILABLE`; SettlementGuard never infers eligibility from an unavailable,
+  `CDM_EVALUATION_UNAVAILABLE`; CompliOpen never infers eligibility from an unavailable,
   malformed, or unverified provider response.
 - Assessments are evidence and workflow signals only. They do **not** authorize, block, or execute
   transactions.
@@ -826,7 +831,7 @@ graph LR
 
 ## Optional AI-Assisted Reasoning
 
-SettlementGuard can optionally generate AI-assisted explanations via `POST /v1/reasoning/:id` (AWS Bedrock, Amazon Nova Micro). This capability exists purely to translate deterministic evaluation results into plain-language commentary for human reviewers.
+CompliOpen can optionally generate AI-assisted explanations via `POST /v1/reasoning/:id` (AWS Bedrock, Amazon Nova Micro). This capability exists purely to translate deterministic evaluation results into plain-language commentary for human reviewers.
 
 - **Informational only** — AI output is commentary, never a decision
 - **Non-deterministic** — model output may vary across invocations
@@ -840,12 +845,12 @@ SettlementGuard can optionally generate AI-assisted explanations via `POST /v1/r
 
 ## FINOS / CDM Contribution
 
-> SettlementGuard is currently being explored as a **proposed deterministic validation and attestation pattern** aligned to CDM lifecycle events within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
+> CompliOpen is currently being explored as a **proposed deterministic validation and attestation pattern** aligned to CDM lifecycle events within the [FINOS Common Domain Model](https://github.com/finos/common-domain-model) ecosystem.
 
 Discussion and design proposal:
 🔗 [finos/common-domain-model#4684](https://github.com/finos/common-domain-model/issues/4684)
 
-The intent is to contribute SettlementGuard's evaluation and attestation pattern as a reusable, standards-aligned building block that complements CDM's lifecycle and workflow representations — enabling the broader ecosystem to share a consistent approach to deterministic validation and verifiable evidence for tokenized financial infrastructure.
+The intent is to contribute CompliOpen's evaluation and attestation pattern as a reusable, standards-aligned building block that complements CDM's lifecycle and workflow representations — enabling the broader ecosystem to share a consistent approach to deterministic validation and verifiable evidence for tokenized financial infrastructure.
 
 ---
 

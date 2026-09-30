@@ -71,7 +71,7 @@ function buildPrompt(
     )
     .join("\n");
 
-  return `You are a compliance analyst for SettlementGuard, a settlement enforcement system for tokenized assets on the Canton Network.
+  return `You are a compliance analyst for CompliOpen, a settlement enforcement system for tokenized assets on the Canton Network.
 
 A settlement intent was evaluated through the Canonical Proof Chain with the following results:
 

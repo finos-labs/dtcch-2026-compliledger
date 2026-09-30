@@ -1,13 +1,13 @@
 # Canton DevNet Readiness
 
 This document describes the current state of Canton/DAML integration in
-SettlementGuard, the architecture of the anchoring flow, the steps required to
+CompliOpen, the architecture of the anchoring flow, the steps required to
 validate the integration on LocalNet, and the requirements that must be met
 before the integration can be considered live on DevNet.
 
 ## 1. Current Status
 
-- **SettlementGuard includes Canton/DAML commitment contracts.** The DAML model
+- **CompliOpen includes Canton/DAML commitment contracts.** The DAML model
   defines the `SettlementCommitment` and `AnchoredCommitment` templates used to
   anchor attestations on a Canton ledger.
 - **Backend supports Canton JSON Ledger API anchoring.** The backend exposes an
@@ -26,7 +26,7 @@ before the integration can be considered live on DevNet.
 The anchoring flow proceeds as follows:
 
 ```
-SettlementGuard attestation
+CompliOpen attestation
         │
         ▼
 proof hash / signature
@@ -41,7 +41,7 @@ SettlementCommitment Daml contract
 AnchoredCommitment / commitment lookup
 ```
 
-1. SettlementGuard produces an attestation for a settlement intent.
+1. CompliOpen produces an attestation for a settlement intent.
 2. The attestation is reduced to a proof hash and signature.
 3. The backend submits a create command to the Canton JSON Ledger API.
 4. The ledger creates a `SettlementCommitment` Daml contract.
@@ -127,7 +127,7 @@ live on DevNet.
 The following exact wording should be used when describing Canton/DAML
 anchoring publicly:
 
-> SettlementGuard includes a Canton/DAML anchoring adapter and DAML commitment
+> CompliOpen includes a Canton/DAML anchoring adapter and DAML commitment
 > contracts. The current implementation supports anchoring to a configured
 > Canton JSON Ledger API environment. DevNet readiness is in progress and
 > should only be described as live after a successful contract creation on a

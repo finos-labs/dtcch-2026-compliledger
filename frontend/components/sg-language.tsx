@@ -34,7 +34,7 @@ const avoidWords = [
   },
   {
     word: "Trust",
-    reason: "SettlementGuard eliminates the need for it",
+    reason: "CompliOpen eliminates the need for it",
   },
   {
     word: "Automatic",

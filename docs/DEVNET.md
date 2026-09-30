@@ -1,6 +1,6 @@
-# SettlementGuard — Canton Network DevNet Readiness
+# CompliOpen — Canton Network DevNet Readiness
 
-This document describes the configuration path for running SettlementGuard
+This document describes the configuration path for running CompliOpen
 against Canton Network **DevNet**, and the verification steps that must pass
 before DevNet can be claimed as "live".
 
@@ -30,7 +30,7 @@ need:
 3. **Party allocation.** Submitter and custodian parties allocated via
    `POST /v2/parties/allocate`. Record both party IDs.
 4. **JWT signing.** An RS256 keypair where the private key is held by
-   SettlementGuard and the public key is registered with your participant's
+   CompliOpen and the public key is registered with your participant's
    OIDC provider. The `sub` claim is a ledger-API user; parties go in
    `actAs` / `readAs` only — never in `sub`.
 5. **Environment configuration.** All of the variables in the table below
